@@ -5,7 +5,7 @@ use axum::{
         Path as AxumPath, State, WebSocketUpgrade,
     },
     http::{header, HeaderMap, StatusCode},
-    response::{Html, IntoResponse},
+    response::{Html, IntoResponse, Response},
     routing::get,
     Router,
 };
@@ -29,7 +29,8 @@ use tower_http::cors::CorsLayer;
 const TEMPLATE_NAME: &str = "main.html";
 static TEMPLATE_ENV: OnceLock<Environment<'static>> = OnceLock::new();
 const MERMAID_JS: &str = include_str!("../static/js/mermaid.min.js");
-const MERMAID_ETAG: &str = concat!("\"", env!("CARGO_PKG_VERSION"), "\"");
+const HIGHLIGHT_JS: &str = include_str!("../static/js/highlight.min.js");
+const STATIC_JS_ETAG: &str = concat!("\"", env!("CARGO_PKG_VERSION"), "\"");
 
 type SharedMarkdownState = Arc<Mutex<MarkdownState>>;
 
@@ -326,6 +327,7 @@ fn new_router(
         .route("/", get(serve_html_root))
         .route("/ws", get(websocket_handler))
         .route("/mermaid.min.js", get(serve_mermaid_js))
+        .route("/highlight.min.js", get(serve_highlight_js))
         .route("/*filepath", get(serve_file))
         .layer(CorsLayer::permissive())
         .with_state(state);
@@ -610,33 +612,29 @@ async fn render_markdown(state: &MarkdownState, current_file: &str) -> (StatusCo
 }
 
 async fn serve_mermaid_js(headers: HeaderMap) -> impl IntoResponse {
-    if is_etag_match(&headers) {
-        return mermaid_response(StatusCode::NOT_MODIFIED, None);
-    }
-
-    mermaid_response(StatusCode::OK, Some(MERMAID_JS))
+    serve_embedded_js(&headers, MERMAID_JS)
 }
 
-fn is_etag_match(headers: &HeaderMap) -> bool {
-    headers
+async fn serve_highlight_js(headers: HeaderMap) -> impl IntoResponse {
+    serve_embedded_js(&headers, HIGHLIGHT_JS)
+}
+
+fn serve_embedded_js(headers: &HeaderMap, content: &'static str) -> Response {
+    let is_match = headers
         .get(header::IF_NONE_MATCH)
         .and_then(|v| v.to_str().ok())
-        .is_some_and(|etags| etags.split(',').any(|tag| tag.trim() == MERMAID_ETAG))
-}
+        .is_some_and(|etags| etags.split(',').any(|tag| tag.trim() == STATIC_JS_ETAG));
 
-fn mermaid_response(status: StatusCode, body: Option<&'static str>) -> impl IntoResponse {
-    // Use no-cache to force revalidation on each request. This ensures clients
-    // get updated content when mdserve is rebuilt with a new Mermaid version,
-    // while still benefiting from 304 responses via ETag matching.
-    let headers = [
+    let response_headers = [
         (header::CONTENT_TYPE, "application/javascript"),
-        (header::ETAG, MERMAID_ETAG),
+        (header::ETAG, STATIC_JS_ETAG),
         (header::CACHE_CONTROL, "public, no-cache"),
     ];
 
-    match body {
-        Some(content) => (status, headers, content).into_response(),
-        None => (status, headers).into_response(),
+    if is_match {
+        (StatusCode::NOT_MODIFIED, response_headers).into_response()
+    } else {
+        (StatusCode::OK, response_headers, content).into_response()
     }
 }
 
