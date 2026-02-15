@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Markdown Preview</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236c6f85' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3Cline x1='8' y1='13' x2='16' y2='13'/%3E%3Cline x1='8' y1='17' x2='16' y2='17'/%3E%3C/svg%3E">
 
     <!-- Critical: Apply theme and sidebar state before first paint to prevent flash -->
     <script>
@@ -12,6 +13,12 @@
             const theme = localStorage.getItem('theme') || 'catppuccin-mocha';
             document.documentElement.setAttribute('data-theme', theme);
             document.documentElement.classList.add('theme-initialized');
+
+            // Restore saved sidebar width before paint
+            const savedWidth = localStorage.getItem('sidebar-width');
+            if (savedWidth) {
+                document.documentElement.style.setProperty('--sidebar-width', savedWidth + 'px');
+            }
 
             // Apply sidebar state to both html and body elements
             // This works because body inherits the collapsed state via CSS selectors
@@ -159,6 +166,31 @@
             background: var(--bg-color);
         }
 
+        body.sidebar-resizing .sidebar,
+        body.sidebar-resizing #content {
+            transition: none;
+        }
+
+        .sidebar-resize-handle {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 4px;
+            height: 100%;
+            cursor: col-resize;
+            z-index: 103;
+        }
+
+        .sidebar-resize-handle:hover,
+        .sidebar-resize-handle.active {
+            background: var(--link-color);
+            opacity: 0.5;
+        }
+
+        body.sidebar-collapsed .sidebar-resize-handle {
+            display: none;
+        }
+
         .sidebar-header {
             height: 68px; /* Space for toggle button */
         }
@@ -211,6 +243,41 @@
             background: var(--border-color-light);
             color: var(--text-color);
             font-weight: 600;
+        }
+
+        .sidebar-search {
+            padding: 0 20px 12px 20px;
+        }
+
+        .sidebar-search input {
+            width: 100%;
+            padding: 6px 10px;
+            font-size: 13px;
+            background: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            outline: none;
+            font-family: inherit;
+            transition: border-color 0.2s var(--transition-timing),
+                        background 0.2s var(--transition-timing);
+        }
+
+        .sidebar-search input:focus {
+            border-color: var(--link-color);
+        }
+
+        .sidebar-search input::placeholder {
+            color: var(--blockquote-color);
+        }
+
+        body.sidebar-collapsed .sidebar-search {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .file-tree li.search-hidden {
+            display: none;
         }
 
         .file-tree summary {
@@ -527,6 +594,120 @@
             if (isCollapsed) {
                 document.body.classList.add('sidebar-collapsed');
             }
+            // restore saved width
+            const savedWidth = localStorage.getItem('sidebar-width');
+            if (savedWidth) {
+                document.documentElement.style.setProperty('--sidebar-width', savedWidth + 'px');
+            }
+        }
+
+        function initSidebarResize() {
+            const handle = document.getElementById('sidebarResizeHandle');
+            if (!handle) return;
+
+            const minWidth = 180;
+            const maxWidthPercent = 0.20;
+
+            handle.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                handle.classList.add('active');
+                document.body.classList.add('sidebar-resizing');
+
+                function onMove(e) {
+                    const maxWidth = window.innerWidth * maxWidthPercent;
+                    const width = Math.min(Math.max(e.clientX, minWidth), maxWidth);
+                    document.documentElement.style.setProperty('--sidebar-width', width + 'px');
+                }
+
+                function onUp() {
+                    handle.classList.remove('active');
+                    document.body.classList.remove('sidebar-resizing');
+                    const current = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width');
+                    localStorage.setItem('sidebar-width', parseInt(current));
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                }
+
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        }
+
+        // sidebar search - filters tree like nvim /
+        function initSidebarSearch() {
+            const input = document.getElementById('sidebarSearch');
+            if (!input) return;
+
+            input.addEventListener('input', function() {
+                const query = this.value.toLowerCase().trim();
+                filterTree(query);
+            });
+
+            // focus search on / key (when not in an input already)
+            document.addEventListener('keydown', function(e) {
+                if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+                    e.preventDefault();
+                    input.focus();
+                }
+                // esc clears search and blurs
+                if (e.key === 'Escape' && document.activeElement === input) {
+                    input.value = '';
+                    filterTree('');
+                    input.blur();
+                }
+            });
+        }
+
+        function filterTree(query) {
+            const tree = document.querySelector('.file-tree');
+            if (!tree) return;
+
+            if (!query) {
+                // clear: show everything, collapse all dirs
+                tree.querySelectorAll('li').forEach(li => li.classList.remove('search-hidden'));
+                tree.querySelectorAll('details').forEach(d => d.removeAttribute('open'));
+                return;
+            }
+
+            // walk bottom-up: mark file nodes, then propagate visibility to parent dirs
+            const allItems = tree.querySelectorAll('li');
+            allItems.forEach(li => {
+                const link = li.querySelector(':scope > a');
+                if (link) {
+                    const text = link.textContent.toLowerCase();
+                    li.classList.toggle('search-hidden', !text.includes(query));
+                }
+            });
+
+            // for directory nodes: visible if dir name matches (show all children)
+            // or if any child is visible. process innermost first.
+            const dirs = Array.from(tree.querySelectorAll('li:has(> details)'));
+            dirs.reverse().forEach(li => {
+                const summary = li.querySelector(':scope > details > summary');
+                const dirName = summary ? summary.textContent.toLowerCase() : '';
+                const dirMatches = dirName.includes(query);
+                const childLis = li.querySelectorAll(':scope > details > ul > li');
+
+                if (dirMatches) {
+                    // dir name matches: show dir and all its children
+                    li.classList.remove('search-hidden');
+                    childLis.forEach(c => c.classList.remove('search-hidden'));
+                    // unhide nested dirs' children too
+                    li.querySelectorAll('li').forEach(nested => nested.classList.remove('search-hidden'));
+                }
+
+                const anyVisible = Array.from(childLis).some(c => !c.classList.contains('search-hidden'));
+                li.classList.toggle('search-hidden', !anyVisible && !dirMatches);
+
+                const details = li.querySelector(':scope > details');
+                if (details) {
+                    if (anyVisible || dirMatches) {
+                        details.setAttribute('open', '');
+                    } else {
+                        details.removeAttribute('open');
+                    }
+                }
+            });
         }
 
         // Mermaid theme management
@@ -656,6 +837,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             initTheme();
             initSidebar();
+            initSidebarResize();
+            initSidebarSearch();
             initMermaid();
             setupLiveReload();
 
@@ -687,13 +870,17 @@
     </svg>
 </button>
 <nav class="sidebar">
+    <div class="sidebar-resize-handle" id="sidebarResizeHandle"></div>
     <div class="sidebar-header"></div>
+    <div class="sidebar-search">
+        <input type="text" id="sidebarSearch" placeholder="/" autocomplete="off" spellcheck="false">
+    </div>
     <div class="sidebar-content">
         <ul class="file-tree">
             {% for item in tree recursive %}
             <li>
                 {% if item.is_dir %}
-                <details open>
+                <details>
                     <summary>{{ item.name }}</summary>
                     <ul>{{ loop(item.children) }}</ul>
                 </details>
