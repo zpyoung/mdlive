@@ -23,7 +23,7 @@ graph LR
 
 ### Single-File Mode
 ```bash
-mdserve README.md
+mdlive README.md
 ```
 - Watches parent directory
 - Tracks single file
@@ -31,7 +31,7 @@ mdserve README.md
 
 ### Directory Mode
 ```bash
-mdserve ./docs/
+mdlive ./docs/
 ```
 - Watches specified directory recursively
 - Tracks all `.md` and `.markdown` files
@@ -83,8 +83,8 @@ classDiagram
 ```
 
 Mode is determined by user intent, not file count:
-- `mdserve /docs/` with 1 file shows sidebar
-- `mdserve single.md` never shows sidebar
+- `mdlive /docs/` with 1 file shows sidebar
+- `mdlive single.md` never shows sidebar
 
 ## Live Reload
 

@@ -6,8 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 mdlive is a markdown workspace server built as a companion for AI coding agents.
 It renders markdown to HTML with live reload via WebSocket, supporting both
-single-file and directory modes. The package name is `mdlive`, the binary is
-`mdserve`.
+single-file and directory modes.
 
 ## Build and test
 
@@ -63,7 +62,7 @@ WebSocket clients (websocket.rs) -> `window.location.reload()`
 ## Design constraints
 
 - **Agent-companion scope.** Not a documentation platform or configurable server.
-- **Zero config.** `mdserve file.md` must work with no flags or config files.
+- **Zero config.** `mdlive file.md` must work with no flags or config files.
 - **Recursive directory tree.** Directory mode recursively scans and watches
   subdirectories, rendering a collapsible tree sidebar.
 - **Pre-rendered in memory.** All tracked files rendered to HTML on startup and

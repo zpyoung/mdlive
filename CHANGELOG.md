@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Refactoring
 
-- Renamed package from `mdserve` to `mdlive` (binary stays `mdserve`)
+- Renamed package and binary from `mdserve` to `mdlive`
 - Split monolithic `app.rs` (1082 lines) into focused modules: state, router, handlers, watcher, tree, template, util
 - Moved integration tests to `tests/` directory, unit tests inline with modules
 - New repo at [bearded-giant/mdlive](https://github.com/bearded-giant/mdlive), independent from the upstream fork

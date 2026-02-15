@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use mdlive::{scan_markdown_files, serve_markdown};
 
 #[derive(Parser)]
-#[command(name = "mdserve")]
-#[command(about = "A simple HTTP server for markdown preview")]
+#[command(name = "mdlive")]
+#[command(about = "Markdown workspace server for AI coding agents")]
 #[command(version)]
 struct Args {
     /// Path to markdown file or directory to serve

@@ -1,20 +1,20 @@
 ---
-name: mdserve
+name: mdlive
 description: >-
-  Preview markdown with mdserve when content is long or likely to be
+  Preview markdown with mdlive when content is long or likely to be
   iterated with the user (tables, diagrams, multi-section docs). Skip
   preview for short markdown that is easy to read directly in the
   terminal.
 ---
 
-# mdserve
+# mdlive
 
 Serve markdown files as live-reloading HTML previews in the browser
-using `mdserve`.
+using `mdlive`.
 
 ## When to use
 
-Use mdserve whenever you produce markdown that benefits from rendered
+Use mdlive whenever you produce markdown that benefits from rendered
 presentation:
 
 - Plans and proposals
@@ -24,21 +24,21 @@ presentation:
 - Multi-file documentation sets
 - Any time the user asks to "preview" or "render" markdown
 
-Use mdserve when markdown is more than about 40 to 60 lines, has
+Use mdlive when markdown is more than about 40 to 60 lines, has
 complex formatting, or is likely to go through multiple edit/review
 iterations with the user.
 
-Do **not** use mdserve for short conversational answers, single code
+Do **not** use mdlive for short conversational answers, single code
 snippets, trivial one-paragraph responses, or any markdown that fits
 comfortably within a terminal window.
 
 ## Workflow
 
 1. Write the markdown file (e.g. `plan.md`).
-2. Start mdserve using the Bash tool with `run_in_background: true` and
+2. Start mdlive using the Bash tool with `run_in_background: true` and
    the `--open` flag to launch the browser automatically:
    ```
-   command: mdserve --open plan.md
+   command: mdlive --open plan.md
    run_in_background: true
    ```
 3. Tell the user the URL (default: http://127.0.0.1:3000).
@@ -48,7 +48,7 @@ comfortably within a terminal window.
 
 ## Port conflicts
 
-Before starting mdserve, check if the default port is in use:
+Before starting mdlive, check if the default port is in use:
 
 ```bash
 ss -tlnp | grep :3000
@@ -57,7 +57,7 @@ ss -tlnp | grep :3000
 If port 3000 is occupied, pick another port:
 
 ```
-command: mdserve --open plan.md --port 3001
+command: mdlive --open plan.md --port 3001
 run_in_background: true
 ```
 
@@ -69,7 +69,7 @@ When producing multiple related markdown files, serve the parent
 directory instead:
 
 ```
-command: mdserve --open docs/
+command: mdlive --open docs/
 run_in_background: true
 ```
 
@@ -90,7 +90,7 @@ elements or shows relationships and flow.
 
 ## Installation
 
-mdserve must be installed on the user's system. If the `mdserve`
+mdlive must be installed on the user's system. If the `mdlive`
 command is not found, ask the user how they would like to install it
 using `AskUserQuestion` with these options:
 
