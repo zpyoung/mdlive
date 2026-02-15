@@ -338,6 +338,147 @@
             background: var(--border-color-light);
         }
 
+        /* Context Menu */
+        .context-menu {
+            display: none;
+            position: fixed;
+            z-index: 1001;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 4px;
+            min-width: 180px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .context-menu.show {
+            display: block;
+        }
+
+        .context-menu-item {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 13px;
+            text-align: left;
+            cursor: pointer;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+
+        .context-menu-item:hover {
+            background: var(--border-color-light);
+        }
+
+        .context-menu-item.destructive {
+            color: #e64553;
+        }
+
+        .context-menu-item.destructive:hover {
+            background: rgba(230, 69, 83, 0.1);
+        }
+
+        /* File Dialog */
+        .file-dialog-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1002;
+            backdrop-filter: blur(4px);
+        }
+
+        .file-dialog-overlay.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .file-dialog {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .file-dialog h3 {
+            margin: 0 0 16px 0;
+            color: var(--text-color);
+            font-size: 16px;
+        }
+
+        .file-dialog input {
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 14px;
+            background: var(--code-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            outline: none;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        }
+
+        .file-dialog input:focus {
+            border-color: var(--link-color);
+        }
+
+        .file-dialog-hint {
+            font-size: 12px;
+            color: var(--blockquote-color);
+            margin-top: 6px;
+        }
+
+        .file-dialog-error {
+            font-size: 13px;
+            color: #e64553;
+            margin-top: 8px;
+            display: none;
+        }
+
+        .file-dialog-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .file-dialog-buttons button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            font-size: 13px;
+            font-family: inherit;
+        }
+
+        .file-dialog-btn-cancel {
+            background: transparent;
+            color: var(--text-color);
+        }
+
+        .file-dialog-btn-cancel:hover {
+            background: var(--border-color-light);
+        }
+
+        .file-dialog-btn-confirm {
+            background: var(--link-color);
+            color: #fff;
+            border-color: var(--link-color);
+        }
+
+        .file-dialog-btn-confirm:hover {
+            opacity: 0.9;
+        }
+
         /* Main Content Area */
         #content {
             /* Center content in remaining space while avoiding sidebar overlap */
@@ -962,6 +1103,195 @@
             }
         }
 
+        // Context menu and file operations
+        function initContextMenu() {
+            var menu = document.getElementById('contextMenu');
+            if (!menu) return;
+
+            document.querySelectorAll('.file-tree a').forEach(function(link) {
+                link.addEventListener('contextmenu', function(e) {
+                    e.preventDefault();
+                    var path = link.getAttribute('href').replace(/^\//, '');
+                    showContextMenu(e.clientX, e.clientY, 'file', path);
+                });
+            });
+
+            document.querySelectorAll('.file-tree summary').forEach(function(summary) {
+                summary.addEventListener('contextmenu', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var details = summary.closest('details');
+                    var dirPath = details ? details.getAttribute('data-dir-path') || '' : '';
+                    showContextMenu(e.clientX, e.clientY, 'directory', dirPath);
+                });
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!menu.contains(e.target)) hideContextMenu();
+            });
+            document.addEventListener('scroll', hideContextMenu, true);
+        }
+
+        function createMenuItem(label, destructive) {
+            var btn = document.createElement('button');
+            btn.className = 'context-menu-item' + (destructive ? ' destructive' : '');
+            btn.textContent = label;
+            return btn;
+        }
+
+        function showContextMenu(x, y, type, path) {
+            var menu = document.getElementById('contextMenu');
+            menu.innerHTML = '';
+
+            if (type === 'file') {
+                var copyBtn = createMenuItem('Copy raw markdown', false);
+                copyBtn.onclick = function() { copyRawMarkdown(path); };
+                var moveBtn = createMenuItem('Move / rename', false);
+                moveBtn.onclick = function() { moveFile(path); };
+                var deleteBtn = createMenuItem('Delete file', true);
+                deleteBtn.onclick = function() { deleteFile(path); };
+                menu.appendChild(copyBtn);
+                menu.appendChild(moveBtn);
+                menu.appendChild(deleteBtn);
+            } else {
+                var newBtn = createMenuItem('New file', false);
+                newBtn.onclick = function() { addNewFile(path); };
+                menu.appendChild(newBtn);
+            }
+
+            menu.classList.add('show');
+            var rect = menu.getBoundingClientRect();
+            if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 8;
+            if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 8;
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+        }
+
+        function hideContextMenu() {
+            var menu = document.getElementById('contextMenu');
+            if (menu) menu.classList.remove('show');
+        }
+
+        function copyRawMarkdown(path) {
+            hideContextMenu();
+            fetch('/api/raw_content?path=' + encodeURIComponent(path))
+                .then(function(r) {
+                    if (!r.ok) throw new Error('Failed to fetch');
+                    return r.text();
+                })
+                .then(function(text) {
+                    return navigator.clipboard.writeText(text);
+                })
+                .catch(function(err) {
+                    alert('Failed to copy: ' + err.message);
+                });
+        }
+
+        function deleteFile(path) {
+            hideContextMenu();
+            if (!confirm('Delete ' + path + '?')) return;
+
+            fetch('/api/delete_file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: path })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success) {
+                    alert('Delete failed: ' + (data.error || 'unknown error'));
+                    return;
+                }
+                if (path === currentFile) {
+                    window.location.href = '/';
+                }
+            })
+            .catch(function(err) {
+                alert('Delete failed: ' + err.message);
+            });
+        }
+
+        function moveFile(path) {
+            hideContextMenu();
+            openFileDialog('Move / rename', path, 'Enter new path relative to root', function(newPath) {
+                fetch('/api/move_file', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: path, target: newPath })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success) {
+                        showFileDialogError(data.error || 'unknown error');
+                        return;
+                    }
+                    closeFileDialog();
+                    if (path === currentFile) {
+                        window.location.href = '/' + data.path;
+                    }
+                })
+                .catch(function(err) {
+                    showFileDialogError(err.message);
+                });
+            });
+        }
+
+        function addNewFile(dirPath) {
+            hideContextMenu();
+            var defaultPath = dirPath ? dirPath + '/new.md' : 'new.md';
+            openFileDialog('New file', defaultPath, 'Path relative to root (.md or .markdown)', function(newPath) {
+                fetch('/api/create_file', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: newPath })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success) {
+                        showFileDialogError(data.error || 'unknown error');
+                        return;
+                    }
+                    closeFileDialog();
+                    window.location.href = '/' + data.path;
+                })
+                .catch(function(err) {
+                    showFileDialogError(err.message);
+                });
+            });
+        }
+
+        var _fileDialogCallback = null;
+
+        function openFileDialog(title, value, hint, onConfirm) {
+            var overlay = document.getElementById('fileDialog');
+            var input = document.getElementById('fileDialogInput');
+            var errorEl = document.getElementById('fileDialogError');
+            document.getElementById('fileDialogTitle').textContent = title;
+            document.getElementById('fileDialogHint').textContent = hint;
+            errorEl.style.display = 'none';
+            input.value = value;
+            _fileDialogCallback = onConfirm;
+            overlay.classList.add('show');
+            var lastSlash = value.lastIndexOf('/');
+            var extDot = value.lastIndexOf('.');
+            input.focus();
+            input.setSelectionRange(lastSlash + 1, extDot > lastSlash ? extDot : value.length);
+        }
+
+        function closeFileDialog() {
+            var overlay = document.getElementById('fileDialog');
+            if (overlay) overlay.classList.remove('show');
+            _fileDialogCallback = null;
+        }
+
+        function showFileDialogError(msg) {
+            var errorEl = document.getElementById('fileDialogError');
+            if (errorEl) {
+                errorEl.textContent = msg;
+                errorEl.style.display = 'block';
+            }
+        }
+
         // Auto-refresh functionality using WebSocket
         function setupLiveReload() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -1005,6 +1335,7 @@
             if (typeof hljs !== 'undefined') { hljs.highlightAll(); }
             initCopyButtons();
             initMermaid();
+            initContextMenu();
             setupLiveReload();
 
             // Modal close functionality
@@ -1017,10 +1348,35 @@
                 }
             });
 
-            // Close modal with ESC key
+            // File dialog events
+            var fileDialogOverlay = document.getElementById('fileDialog');
+            var fileDialogConfirmBtn = document.getElementById('fileDialogConfirm');
+            if (fileDialogConfirmBtn) {
+                fileDialogConfirmBtn.addEventListener('click', function() {
+                    if (_fileDialogCallback) {
+                        _fileDialogCallback(document.getElementById('fileDialogInput').value.trim());
+                    }
+                });
+            }
+            if (fileDialogOverlay) {
+                fileDialogOverlay.addEventListener('click', function(e) {
+                    if (e.target === fileDialogOverlay) closeFileDialog();
+                });
+                document.getElementById('fileDialogInput').addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && _fileDialogCallback) {
+                        _fileDialogCallback(this.value.trim());
+                    }
+                });
+            }
+
+            // Close modals with ESC key
             document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape' && modal.classList.contains('show')) {
-                    closeThemeModal();
+                if (e.key === 'Escape') {
+                    if (fileDialogOverlay && fileDialogOverlay.classList.contains('show')) {
+                        closeFileDialog();
+                    } else if (modal.classList.contains('show')) {
+                        closeThemeModal();
+                    }
                 }
             });
         });
@@ -1045,7 +1401,7 @@
             {% for item in tree recursive %}
             <li>
                 {% if item.is_dir %}
-                <details>
+                <details data-dir-path="{{ item.dir_path }}">
                     <summary>{{ item.name }}</summary>
                     <ul>{{ loop(item.children) }}</ul>
                 </details>
@@ -1059,6 +1415,20 @@
         </ul>
     </div>
 </nav>
+<div id="contextMenu" class="context-menu"></div>
+<div id="fileDialog" class="file-dialog-overlay">
+    <div class="file-dialog">
+        <h3 id="fileDialogTitle"></h3>
+        <input type="text" id="fileDialogInput" autocomplete="off" spellcheck="false">
+        <div class="file-dialog-hint" id="fileDialogHint"></div>
+        <div class="file-dialog-error" id="fileDialogError"></div>
+        <div class="file-dialog-buttons">
+            <button class="file-dialog-btn-cancel" onclick="closeFileDialog()">Cancel</button>
+            <button class="file-dialog-btn-confirm" id="fileDialogConfirm">Confirm</button>
+        </div>
+    </div>
+</div>
+<script>var currentFile = "{{ current_file }}";</script>
 {% endif %}
 
 <button class="theme-toggle" onclick="openThemeModal()">🎨</button>
