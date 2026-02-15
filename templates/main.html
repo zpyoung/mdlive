@@ -64,6 +64,15 @@
             --blockquote-color: #6a737d;
             --link-color: #0366d6;
             --table-header-bg: #f6f8fa;
+            --hl-keyword: #cf222e;
+            --hl-string: #0a3069;
+            --hl-number: #0550ae;
+            --hl-comment: #6e7781;
+            --hl-function: #8250df;
+            --hl-built-in: #953800;
+            --hl-literal: #0550ae;
+            --hl-meta: #953800;
+            --hl-attr: #953800;
             --sidebar-width: 250px;
             --sidebar-collapsed-width: 48px;
             --content-max-width: 900px;
@@ -80,6 +89,15 @@
             --blockquote-color: #8b949e;
             --link-color: #58a6ff;
             --table-header-bg: #161b22;
+            --hl-keyword: #ff7b72;
+            --hl-string: #a5d6ff;
+            --hl-number: #79c0ff;
+            --hl-comment: #8b949e;
+            --hl-function: #d2a8ff;
+            --hl-built-in: #ffa657;
+            --hl-literal: #79c0ff;
+            --hl-meta: #ffa657;
+            --hl-attr: #79c0ff;
         }
 
         [data-theme="catppuccin-latte"] {
@@ -91,6 +109,15 @@
             --blockquote-color: #6c6f85;
             --link-color: #1e66f5;
             --table-header-bg: #ccd0da;
+            --hl-keyword: #8839ef;
+            --hl-string: #40a02b;
+            --hl-number: #fe640b;
+            --hl-comment: #9ca0b0;
+            --hl-function: #1e66f5;
+            --hl-built-in: #df8e1d;
+            --hl-literal: #fe640b;
+            --hl-meta: #d20f39;
+            --hl-attr: #df8e1d;
         }
 
         [data-theme="catppuccin-macchiato"] {
@@ -102,6 +129,15 @@
             --blockquote-color: #a5adcb;
             --link-color: #8aadf4;
             --table-header-bg: #363a4f;
+            --hl-keyword: #c6a0f6;
+            --hl-string: #a6da95;
+            --hl-number: #f5a97f;
+            --hl-comment: #6e738d;
+            --hl-function: #8aadf4;
+            --hl-built-in: #eed49f;
+            --hl-literal: #f5a97f;
+            --hl-meta: #ed8796;
+            --hl-attr: #eed49f;
         }
 
         [data-theme="catppuccin-mocha"] {
@@ -113,6 +149,15 @@
             --blockquote-color: #a6adc8;
             --link-color: #89b4fa;
             --table-header-bg: #313244;
+            --hl-keyword: #cba6f7;
+            --hl-string: #a6e3a1;
+            --hl-number: #fab387;
+            --hl-comment: #6c7086;
+            --hl-function: #89b4fa;
+            --hl-built-in: #f9e2af;
+            --hl-literal: #fab387;
+            --hl-meta: #f38ba8;
+            --hl-attr: #f9e2af;
         }
 
         /* Common body styles */
@@ -493,6 +538,40 @@
             border-radius: 6px;
             padding: 16px;
             overflow: auto;
+            position: relative;
+        }
+
+        pre .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 4px 6px;
+            cursor: pointer;
+            color: var(--blockquote-color);
+            opacity: 0;
+            transition: opacity 0.2s ease, background 0.2s ease;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        pre:hover .copy-btn {
+            opacity: 1;
+        }
+
+        pre .copy-btn:hover {
+            background: var(--border-color-light);
+            color: var(--text-color);
+        }
+
+        pre .copy-btn.copied {
+            opacity: 1;
+            color: #a6e3a1;
+            border-color: #a6e3a1;
         }
         code {
             background-color: var(--code-bg);
@@ -504,6 +583,24 @@
             background-color: transparent;
             padding: 0;
         }
+        pre code.hljs { background: transparent; padding: 0; }
+        .hljs-keyword, .hljs-selector-tag { color: var(--hl-keyword); }
+        .hljs-string, .hljs-doctag, .hljs-regexp { color: var(--hl-string); }
+        .hljs-number { color: var(--hl-number); }
+        .hljs-comment { color: var(--hl-comment); font-style: italic; }
+        .hljs-title, .hljs-title\.function_ { color: var(--hl-function); }
+        .hljs-built_in { color: var(--hl-built-in); }
+        .hljs-literal { color: var(--hl-literal); }
+        .hljs-meta, .hljs-meta .hljs-keyword { color: var(--hl-meta); }
+        .hljs-attr, .hljs-attribute { color: var(--hl-attr); }
+        .hljs-type, .hljs-title\.class_ { color: var(--hl-built-in); }
+        .hljs-variable, .hljs-template-variable { color: var(--text-color); }
+        .hljs-params { color: var(--text-color); }
+        .hljs-punctuation { color: var(--blockquote-color); }
+        .hljs-symbol { color: var(--hl-literal); }
+        .hljs-section { color: var(--hl-function); font-weight: bold; }
+        .hljs-addition { color: var(--hl-string); }
+        .hljs-deletion { color: var(--hl-meta); }
         blockquote {
             border-left: 4px solid var(--border-color-light);
             padding-left: 16px;
@@ -537,6 +634,7 @@
         img { max-width: 100%; height: auto; }
     </style>
 
+    <script src="/highlight.min.js"></script>
     {% if mermaid_enabled %}
     <script src="/mermaid.min.js"></script>
     {% endif %}
@@ -710,6 +808,33 @@
             });
         }
 
+        // copy button on fenced code blocks
+        function initCopyButtons() {
+            const copyIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+            const checkIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+
+            document.querySelectorAll('pre > code').forEach(function(codeEl) {
+                const pre = codeEl.parentElement;
+                const btn = document.createElement('button');
+                btn.className = 'copy-btn';
+                btn.innerHTML = copyIcon;
+                btn.setAttribute('aria-label', 'Copy code');
+
+                btn.addEventListener('click', function() {
+                    navigator.clipboard.writeText(codeEl.textContent).then(function() {
+                        btn.innerHTML = checkIcon;
+                        btn.classList.add('copied');
+                        setTimeout(function() {
+                            btn.innerHTML = copyIcon;
+                            btn.classList.remove('copied');
+                        }, 2000);
+                    });
+                });
+
+                pre.appendChild(btn);
+            });
+        }
+
         // Mermaid theme management
         function getMermaidTheme() {
             const currentTheme = document.documentElement.getAttribute('data-theme');
@@ -839,6 +964,8 @@
             initSidebar();
             initSidebarResize();
             initSidebarSearch();
+            if (typeof hljs !== 'undefined') { hljs.highlightAll(); }
+            initCopyButtons();
             initMermaid();
             setupLiveReload();
 
