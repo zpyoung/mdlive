@@ -1,0 +1,70 @@
+use anyhow::Result;
+use axum::{
+    routing::{get, post},
+    Router,
+};
+use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
+use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::{mpsc, Mutex};
+use tower_http::cors::CorsLayer;
+
+use crate::handlers;
+use crate::state::MarkdownState;
+use crate::watcher::handle_file_event;
+
+pub fn new_router(
+    base_dir: PathBuf,
+    tracked_files: Vec<PathBuf>,
+    is_directory_mode: bool,
+) -> Result<Router> {
+    let base_dir = base_dir.canonicalize()?;
+
+    let state = Arc::new(Mutex::new(MarkdownState::new(
+        base_dir.clone(),
+        tracked_files,
+        is_directory_mode,
+    )?));
+
+    let watcher_state = state.clone();
+    let (tx, mut rx) = mpsc::channel(100);
+
+    let mut watcher = RecommendedWatcher::new(
+        move |res: std::result::Result<Event, notify::Error>| {
+            if let Ok(event) = res {
+                let _ = tx.blocking_send(event);
+            }
+        },
+        Config::default(),
+    )?;
+
+    watcher.watch(&base_dir, RecursiveMode::Recursive)?;
+
+    tokio::spawn(async move {
+        let _watcher = watcher;
+        while let Some(event) = rx.recv().await {
+            handle_file_event(event, &watcher_state).await;
+        }
+    });
+
+    let router = Router::new()
+        .route("/", get(handlers::pages::serve_html_root))
+        .route("/ws", get(handlers::websocket::websocket_handler))
+        .route(
+            "/mermaid.min.js",
+            get(handlers::static_files::serve_mermaid_js),
+        )
+        .route(
+            "/highlight.min.js",
+            get(handlers::static_files::serve_highlight_js),
+        )
+        .route("/api/raw_content", get(handlers::api::api_raw_content))
+        .route("/api/delete_file", post(handlers::api::api_delete_file))
+        .route("/api/move_file", post(handlers::api::api_move_file))
+        .route("/api/create_file", post(handlers::api::api_create_file))
+        .route("/*filepath", get(handlers::pages::serve_file))
+        .layer(CorsLayer::permissive())
+        .with_state(state);
+
+    Ok(router)
+}

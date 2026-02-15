@@ -1,20 +1,22 @@
-# mdserve Architecture
+# mdlive Architecture
 
 ## Overview
 
-mdserve is a simple HTTP server for markdown preview with live reload. It supports both single-file and directory modes with a unified codebase.
+mdlive is a markdown workspace server for AI coding agents with live reload.
+It supports single-file and directory modes through a unified architecture.
 
 **Core principle**: Always work with a base directory and a list of tracked files (1 or more).
 
 ```mermaid
 graph LR
-    A[File System] -->|notify events| B[File Watcher]
-    B -->|update state| C[MarkdownState]
-    B -->|broadcast| D[WebSocket]
-    E[HTTP Request] -->|lookup| C
-    C -->|render| F[Template]
-    F -->|HTML| G[Browser]
-    D -->|reload signal| G
+    A[File System] -->|notify events| B[watcher.rs]
+    B -->|update state| C[state.rs]
+    B -->|broadcast| D[websocket.rs]
+    E[HTTP Request] -->|router.rs| F[handlers/]
+    F -->|lookup| C
+    C -->|render| G[template.rs]
+    G -->|HTML| H[Browser]
+    D -->|reload signal| H
 ```
 
 ## Modes
@@ -31,17 +33,34 @@ mdserve README.md
 ```bash
 mdserve ./docs/
 ```
-- Watches specified directory
+- Watches specified directory recursively
 - Tracks all `.md` and `.markdown` files
-- Shows navigation sidebar
+- Shows collapsible tree sidebar
 
-## Architecture
+## Module Structure
 
-### State Management
+```
+src/
+  main.rs           -- CLI parsing (clap), calls lib entry point
+  lib.rs            -- public API: serve_markdown(), scan_markdown_files()
+  state.rs          -- MarkdownState, TrackedFile, SharedMarkdownState
+  router.rs         -- new_router(), route registration, watcher setup
+  handlers/
+    pages.rs        -- serve_html_root, serve_file, render_markdown
+    api.rs          -- CRUD endpoints (raw content, delete, move, create)
+    static_files.rs -- embedded JS serving with ETag caching
+    websocket.rs    -- WebSocket handler for live reload
+  watcher.rs        -- file event handling (notify crate)
+  tree.rs           -- build_file_tree (pure data transform)
+  util.rs           -- is_markdown_file, is_image_file, scan helpers
+  template.rs       -- MiniJinja setup, embedded JS constants
+```
+
+## State Management
 
 Central state stores:
 - Base directory path
-- HashMap of tracked files (filename → metadata + pre-rendered HTML)
+- HashMap of tracked files (filename -> metadata + pre-rendered HTML)
 - Directory mode flag (determines UI)
 - WebSocket broadcast channel
 
@@ -67,86 +86,60 @@ Mode is determined by user intent, not file count:
 - `mdserve /docs/` with 1 file shows sidebar
 - `mdserve single.md` never shows sidebar
 
-**Example states:**
+## Live Reload
 
-Single-file mode:
-```
-base_dir = /path/to/docs/
-tracked_files = {
-  "README.md": TrackedFile { ... }
-}
-is_directory_mode = false
-```
-
-Directory mode (keys are relative paths):
-```
-base_dir = /path/to/docs/
-tracked_files = {
-  "README.md": TrackedFile { ... },
-  "api.md": TrackedFile { ... },
-  "guides/getting-started.md": TrackedFile { ... },
-  "guides/advanced.md": TrackedFile { ... }
-}
-is_directory_mode = true
-```
-
-### Live Reload
-
-Uses [notify](https://github.com/notify-rs/notify) crate to watch base directory recursively:
-- Create/modify: Refresh file, add if new (directory mode only)
-- Delete: Remove from tracking
-- Rename: Remove old, add new
-- All changes trigger WebSocket reload broadcast
+Uses [notify](https://github.com/notify-rs/notify) crate to watch base directory recursively.
 
 File changes flow:
 1. File system event detected by `notify`
-2. Markdown re-rendered to HTML
-3. State updated (refresh/add/remove tracked file)
-4. `ServerMessage::Reload` broadcast via WebSocket channel
-5. All connected clients receive reload message
+2. `handle_file_event` (watcher.rs) processes the event
+3. Markdown re-rendered to HTML in `MarkdownState`
+4. `ServerMessage::Reload` broadcast via channel
+5. WebSocket clients receive reload message
 6. Clients execute `window.location.reload()`
 
-### Routing
+Events handled:
+- Create/modify: refresh file, add if new (directory mode only)
+- Delete: ignored (editors like neovim save via rename-to-backup then create-new)
+- Rename: track new path
+- Image changes: trigger reload without tracking
 
-Single unified router handles both modes:
-- `GET /` → First file alphabetically
-- `GET /*filepath` → Markdown files (matched by relative path) or images (including subdirectories)
-- `GET /ws` → WebSocket connection
-- `GET /mermaid.min.js` → Bundled Mermaid library
+## Routing
 
-The `/*filepath` wildcard route serves both markdown and images. Markdown lookup
-uses the relative path as key (e.g. `docs/guide.md`), matching the URL path
-directly. Directory traversal is blocked by `canonicalize` + `starts_with(base_dir)`
-validation in the static file handler.
+Single unified router (router.rs) handles both modes:
+- `GET /` -> first file alphabetically
+- `GET /:filename` -> markdown files or images
+- `GET /ws` -> WebSocket connection
+- `GET /mermaid.min.js` -> bundled Mermaid library
+- `GET /highlight.min.js` -> bundled highlight.js
+- `GET /api/raw_content` -> raw markdown content
+- `POST /api/delete_file` -> delete a tracked file
+- `POST /api/move_file` -> rename/move a tracked file
+- `POST /api/create_file` -> create a new markdown file
 
-### Rendering
+Directory traversal blocked by `canonicalize` + `starts_with(base_dir)` validation.
 
-Uses [MiniJinja](https://github.com/mitsuhiko/minijinja) (Jinja2 template syntax) with templates embedded at compile time via [minijinja_embed](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-embed).
+## Rendering
 
-Conditional template rendering:
-- Directory mode: Includes navigation sidebar with active file highlighting
-- Single-file mode: Content only
-- Both use same pre-rendered HTML from state
+Uses [MiniJinja](https://github.com/mitsuhiko/minijinja) with templates embedded
+at compile time via `minijinja_embed`. Single template (`main.html`) handles both
+modes via conditional blocks.
 
 Template variables:
-- `content`: Pre-rendered markdown HTML
-- `mermaid_enabled`: Boolean flag, conditionally includes Mermaid.js when diagrams detected
-- `show_navigation`: Controls sidebar visibility
-- `tree`: Nested tree of tracked files and directories (directory mode)
-- `current_file`: Active file's relative path (directory mode)
+- `content`: pre-rendered markdown HTML
+- `mermaid_enabled`: conditionally includes Mermaid.js
+- `show_navigation`: controls sidebar visibility
+- `tree`: nested tree of files and directories
+- `current_file`: active file's relative path
 
 ## Design Decisions
 
-**Unified architecture**: Single code path handles both single-file and directory modes. Mode determined by user intent, not file count.
+**Unified architecture**: single code path handles both modes. Mode determined by user intent, not file count.
 
-**Pre-rendered caching**: All tracked files rendered to HTML in memory on startup and file change. Serving always from memory, never from disk.
+**Pre-rendered caching**: all tracked files rendered to HTML in memory on startup and on change. Serving always from memory, never from disk.
 
-**Recursive directory tree**: Subdirectories are scanned and watched recursively. The sidebar renders a collapsible tree using native `<details>/<summary>` elements with zero JS.
+**Recursive directory tree**: subdirectories scanned and watched recursively. Sidebar renders a collapsible tree using `<details>/<summary>` elements.
 
-**Server-side logic**: Most logic lives server-side (markdown rendering, file tracking, navigation, active file highlighting, live reload triggering). Client-side JavaScript minimal (theme management, reload execution).
+**No file removal on delete**: editors save via rename-to-backup then create-new. Removing on delete would cause transient 404s.
 
-## Constraints
-
-- Recursive markdown tracking across subdirectories; images also served from subdirectories
-- Alphabetical file ordering only
-- All files pre-rendered in memory
+**Server-side logic**: most logic lives server-side. Client JS minimal (theme, reload, Mermaid rendering).

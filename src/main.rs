@@ -2,9 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
 
-mod app;
-
-use app::{scan_markdown_files, serve_markdown};
+use mdlive::{scan_markdown_files, serve_markdown};
 
 #[derive(Parser)]
 #[command(name = "mdserve")]
@@ -33,7 +31,6 @@ async fn main() -> Result<()> {
     let absolute_path = args.path.canonicalize().unwrap_or(args.path);
 
     let (base_dir, tracked_files, is_directory_mode) = if absolute_path.is_file() {
-        // Single-file mode: derive parent directory
         let base_dir = absolute_path
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."))
@@ -41,7 +38,6 @@ async fn main() -> Result<()> {
         let tracked_files = vec![absolute_path];
         (base_dir, tracked_files, false)
     } else if absolute_path.is_dir() {
-        // Directory mode: scan directory for markdown files
         let tracked_files = scan_markdown_files(&absolute_path)?;
         if tracked_files.is_empty() {
             anyhow::bail!("No markdown files found in directory");
@@ -51,7 +47,6 @@ async fn main() -> Result<()> {
         anyhow::bail!("Path must be a file or directory");
     };
 
-    // Single unified serve function
     serve_markdown(
         base_dir,
         tracked_files,
