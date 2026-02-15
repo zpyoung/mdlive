@@ -731,6 +731,44 @@
             });
         }
 
+        // persist tree open/closed state across page loads
+        function initTreeState() {
+            const tree = document.querySelector('.file-tree');
+            if (!tree) return;
+
+            var saved = {};
+            try { saved = JSON.parse(localStorage.getItem('tree-state') || '{}'); } catch(e) {}
+
+            tree.querySelectorAll('details').forEach(function(d) {
+                var key = d.querySelector('summary').textContent.trim();
+                if (saved[key]) d.setAttribute('open', '');
+                d.addEventListener('toggle', function() { saveTreeState(); });
+            });
+        }
+
+        function saveTreeState() {
+            var tree = document.querySelector('.file-tree');
+            if (!tree) return;
+            var state = {};
+            tree.querySelectorAll('details').forEach(function(d) {
+                var key = d.querySelector('summary').textContent.trim();
+                if (d.open) state[key] = true;
+            });
+            localStorage.setItem('tree-state', JSON.stringify(state));
+        }
+
+        function restoreTreeState() {
+            var tree = document.querySelector('.file-tree');
+            if (!tree) return;
+            var saved = {};
+            try { saved = JSON.parse(localStorage.getItem('tree-state') || '{}'); } catch(e) {}
+            tree.querySelectorAll('details').forEach(function(d) {
+                var key = d.querySelector('summary').textContent.trim();
+                if (saved[key]) d.setAttribute('open', '');
+                else d.removeAttribute('open');
+            });
+        }
+
         // sidebar search - filters tree like nvim /
         function initSidebarSearch() {
             const input = document.getElementById('sidebarSearch');
@@ -761,9 +799,8 @@
             if (!tree) return;
 
             if (!query) {
-                // clear: show everything, collapse all dirs
                 tree.querySelectorAll('li').forEach(li => li.classList.remove('search-hidden'));
-                tree.querySelectorAll('details').forEach(d => d.removeAttribute('open'));
+                restoreTreeState();
                 return;
             }
 
@@ -963,6 +1000,7 @@
             initTheme();
             initSidebar();
             initSidebarResize();
+            initTreeState();
             initSidebarSearch();
             if (typeof hljs !== 'undefined') { hljs.highlightAll(); }
             initCopyButtons();
