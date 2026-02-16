@@ -1,3 +1,5 @@
+![mdlive](static/img/md-hero.png)
+
 # mdlive
 
 A live markdown viewer I built to sit next to AI coding agents. When an agent writes markdown -- plans, architecture docs, research -- I'd rather read it rendered in a browser than squint at raw text in a terminal.
