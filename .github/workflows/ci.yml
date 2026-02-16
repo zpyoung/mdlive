@@ -35,7 +35,7 @@ jobs:
           - target: aarch64-unknown-linux-musl
             os: ubuntu-24.04-arm
           - target: x86_64-apple-darwin
-            os: macos-15-intel
+            os: macos-latest
           - target: aarch64-apple-darwin
             os: macos-latest
 
@@ -46,6 +46,10 @@ jobs:
 
     - name: Report Rust version
       run: rustup show
+
+    - name: Install musl tools
+      if: contains(matrix.target, 'musl')
+      run: sudo apt-get update && sudo apt-get install -y musl-tools
 
     - name: Install target
       run: rustup target add ${{ matrix.target }}

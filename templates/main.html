@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>mdlive: {{ current_file|default('preview')|safe }}</title>
+    <title>mdlive: {{ current_file|default('preview') }}</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236c6f85' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3Cline x1='8' y1='13' x2='16' y2='13'/%3E%3Cline x1='8' y1='17' x2='16' y2='17'/%3E%3C/svg%3E">
 
     <!-- Critical: Apply theme and sidebar state before first paint to prevent flash -->
@@ -1679,7 +1679,7 @@
     </div>
 </nav>
 {% endif %}
-<script>var currentFile = "{{ current_file|default('')|safe }}";</script>
+<script>var currentFile = {{ current_file|default('')|tojson }};</script>
 <div id="contextMenu" class="context-menu"></div>
 <div id="fileDialog" class="file-dialog-overlay">
     <div class="file-dialog">
@@ -1709,7 +1709,7 @@
     <div class="editor-notify" id="editorNotify">File changed externally -- reload to see changes</div>
     <div class="editor-header">
         {% if new_file_mode %}
-        <input type="text" class="editor-filename-input" id="editorFilename" value="{{ current_file|safe }}" spellcheck="false" autocomplete="off">
+        <input type="text" class="editor-filename-input" id="editorFilename" value="{{ current_file }}" spellcheck="false" autocomplete="off">
         {% else %}
         <span class="editor-filename">{{ current_file }}</span>
         {% endif %}
@@ -1747,7 +1747,7 @@
     var preview = document.getElementById('editorPreview');
     var saveBtn = document.getElementById('editorSaveBtn');
     var isNewFile = {{ new_file_mode|default(false)|lower }};
-    var filePath = "{{ current_file|safe }}";
+    var filePath = {{ current_file|tojson }};
     var debounceTimer = null;
     var hasUnsavedChanges = false;
 
