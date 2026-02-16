@@ -898,6 +898,29 @@
             color: #1e1e2e;
         }
 
+        .editor-btn-icon {
+            padding: 4px 6px;
+            border: none;
+            opacity: 0.4;
+        }
+
+        .editor-btn-icon:hover {
+            opacity: 1;
+            background: var(--border-color-light);
+        }
+
+        .editor-btn-destructive {
+            color: #e64553;
+            border-color: transparent;
+            opacity: 0.6;
+        }
+
+        .editor-btn-destructive:hover {
+            background: rgba(230, 69, 83, 0.1);
+            border-color: #e64553;
+            opacity: 1;
+        }
+
         .unsaved-dot {
             display: none;
             width: 8px;
@@ -1404,10 +1427,10 @@
             });
 
             // directory mode: right-click empty sidebar space for root-level new file
-            var sidebarContent = document.querySelector('.sidebar-content');
-            if (sidebarContent) {
-                sidebarContent.addEventListener('contextmenu', function(e) {
-                    if (e.target.closest('a, summary')) return;
+            var sidebar = document.querySelector('.sidebar');
+            if (sidebar) {
+                sidebar.addEventListener('contextmenu', function(e) {
+                    if (e.target.closest('a, summary, input, .sidebar-resize-handle')) return;
                     e.preventDefault();
                     showContextMenu(e.clientX, e.clientY, 'directory', '');
                 });
@@ -1792,8 +1815,17 @@
         <input type="text" class="editor-filename-input" id="editorFilename" value="{{ current_file }}" spellcheck="false" autocomplete="off">
         {% else %}
         <span class="editor-filename">{{ current_file }}</span>
+        <button class="editor-btn editor-btn-icon" onclick="editorRename()" title="Rename / move">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+        </button>
         {% endif %}
         <div class="editor-spacer"></div>
+        {% if not new_file_mode %}
+        <button class="editor-btn editor-btn-destructive" onclick="editorDelete()">Delete</button>
+        {% endif %}
         {% if has_history %}
         <button class="editor-btn" id="editorHistoryBtn" onclick="toggleHistory()">History</button>
         {% endif %}
@@ -2047,6 +2079,64 @@
         } else {
             window.location.href = '/' + filePath;
         }
+    };
+
+    // rename from editor
+    window.editorRename = function() {
+        var proceed = function() {
+            openFileDialog('Move / rename', filePath, 'Enter new path relative to root', function(newPath) {
+                fetch('/api/move_file', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: filePath, target: newPath })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success) {
+                        showFileDialogError(data.error || 'unknown error');
+                        return;
+                    }
+                    closeFileDialog();
+                    hasUnsavedChanges = false;
+                    window.location.href = '/edit/' + data.path;
+                })
+                .catch(function(err) {
+                    showFileDialogError(err.message);
+                });
+            });
+        };
+
+        if (hasUnsavedChanges) {
+            showConfirm('You have unsaved changes that will be lost. Continue?', proceed);
+        } else {
+            proceed();
+        }
+    };
+
+    // delete from editor
+    window.editorDelete = function() {
+        var msg = hasUnsavedChanges
+            ? 'You have unsaved changes. Delete ' + filePath + '?'
+            : 'Delete ' + filePath + '?';
+        showConfirm(msg, function() {
+            fetch('/api/delete_file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: filePath })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success) {
+                    alert('Delete failed: ' + (data.error || 'unknown error'));
+                    return;
+                }
+                hasUnsavedChanges = false;
+                window.location.href = '/';
+            })
+            .catch(function(err) {
+                alert('Delete failed: ' + err.message);
+            });
+        }, { destructive: true });
     };
 
     // websocket: suppress reload in editor mode
