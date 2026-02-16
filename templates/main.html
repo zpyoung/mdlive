@@ -20,6 +20,12 @@
                 document.documentElement.style.setProperty('--sidebar-width', savedWidth + 'px');
             }
 
+            // restore editor split ratio
+            const savedSplit = localStorage.getItem('editor-split');
+            if (savedSplit) {
+                document.documentElement.style.setProperty('--editor-split', savedSplit + '%');
+            }
+
             // Apply sidebar state to both html and body elements
             // This works because body inherits the collapsed state via CSS selectors
             const isSidebarCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
@@ -212,7 +218,8 @@
         }
 
         body.sidebar-resizing .sidebar,
-        body.sidebar-resizing #content {
+        body.sidebar-resizing #content,
+        body.sidebar-resizing .sidebar-toggle {
             transition: none;
         }
 
@@ -357,7 +364,7 @@
         .sidebar-toggle {
             position: fixed;
             top: 20px;
-            left: 20px;
+            left: calc(var(--sidebar-width) - 52px);
             background: transparent;
             border: none;
             border-radius: 6px;
@@ -554,7 +561,7 @@
 
         .theme-toggle {
             position: fixed;
-            top: 20px;
+            bottom: 20px;
             right: 20px;
             background: var(--code-bg);
             border: 1px solid var(--border-color-light);
@@ -577,7 +584,7 @@
         .edit-toggle {
             position: fixed;
             top: 20px;
-            right: 60px;
+            right: 20px;
             background: var(--code-bg);
             border: 1px solid var(--border-color-light);
             border-radius: 6px;
@@ -946,8 +953,26 @@
             min-width: 0;
         }
 
-        .editor-pane + .editor-pane {
-            border-left: 1px solid var(--border-color);
+        .editor-pane:first-child {
+            flex: 0 0 var(--editor-split, 50%);
+        }
+
+        .editor-pane-resize-handle {
+            flex-shrink: 0;
+            width: 4px;
+            cursor: col-resize;
+            background: var(--border-color);
+        }
+
+        .editor-pane-resize-handle:hover,
+        .editor-pane-resize-handle.active {
+            background: var(--link-color);
+            opacity: 0.5;
+        }
+
+        body.editor-resizing {
+            user-select: none;
+            cursor: col-resize;
         }
 
         .editor-pane textarea {
@@ -1064,6 +1089,8 @@
         {% if show_navigation and editor_mode %}
         .editor-container {
             margin-left: var(--sidebar-width);
+            flex: 1;
+            min-width: 0;
             transition: margin-left var(--transition-speed) var(--transition-timing);
         }
 
@@ -1829,13 +1856,14 @@
         {% if has_history %}
         <button class="editor-btn" id="editorHistoryBtn" onclick="toggleHistory()">History</button>
         {% endif %}
-        <button class="editor-btn" onclick="editorCancel()">Cancel</button>
+        <button class="editor-btn" onclick="editorCancel()">Close</button>
         <button class="editor-btn editor-btn-save" id="editorSaveBtn" onclick="editorSave()">Save</button>
     </div>
     <div class="editor-panes">
         <div class="editor-pane">
             <textarea id="editorTextarea" spellcheck="false">{{ raw_content }}</textarea>
         </div>
+        <div class="editor-pane-resize-handle" id="editorResizeHandle"></div>
         <div class="editor-pane">
             <div id="editorPreview" class="editor-preview markdown-body"></div>
         </div>
@@ -2029,6 +2057,7 @@
 
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving...';
+        _suppressReloadUntil = Date.now() + 3000;
 
         fetch(endpoint, {
             method: 'POST',
@@ -2140,6 +2169,7 @@
     };
 
     // websocket: suppress reload in editor mode
+    var _suppressReloadUntil = 0;
     window._editorSetupLiveReload = function() {
         var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         var wsUrl = protocol + '//' + window.location.host + '/ws';
@@ -2150,6 +2180,7 @@
             try {
                 var message = JSON.parse(event.data);
                 if (message.type === 'Reload') {
+                    if (Date.now() < _suppressReloadUntil) return;
                     notify.classList.add('show');
                     setTimeout(function() {
                         notify.classList.remove('show');
@@ -2237,6 +2268,45 @@
         div.textContent = str;
         return div.innerHTML;
     }
+
+    // editor pane resize
+    var resizeHandle = document.getElementById('editorResizeHandle');
+    if (resizeHandle) {
+        var panes = document.querySelector('.editor-panes');
+        resizeHandle.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            resizeHandle.classList.add('active');
+            document.body.classList.add('editor-resizing');
+
+            function onMove(e) {
+                var rect = panes.getBoundingClientRect();
+                var percent = ((e.clientX - rect.left) / rect.width) * 100;
+                percent = Math.min(Math.max(percent, 20), 80);
+                document.documentElement.style.setProperty('--editor-split', percent + '%');
+            }
+
+            function onUp() {
+                resizeHandle.classList.remove('active');
+                document.body.classList.remove('editor-resizing');
+                var val = getComputedStyle(document.documentElement).getPropertyValue('--editor-split');
+                localStorage.setItem('editor-split', parseFloat(val));
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+    }
+
+    // scroll sync: textarea -> preview (line-ratio)
+    var previewPane = preview.parentElement;
+    textarea.addEventListener('scroll', function() {
+        var max = this.scrollHeight - this.clientHeight;
+        if (max <= 0) return;
+        var ratio = this.scrollTop / max;
+        previewPane.scrollTop = ratio * (previewPane.scrollHeight - previewPane.clientHeight);
+    });
 })();
 </script>
 {% else %}
