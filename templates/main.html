@@ -1045,6 +1045,13 @@
             opacity: 1;
         }
 
+        .header-separator {
+            width: 1px;
+            height: 20px;
+            background: var(--border-color);
+            flex-shrink: 0;
+        }
+
         .unsaved-dot {
             display: none;
             width: 8px;
@@ -1056,6 +1063,22 @@
 
         .editor-header.unsaved .unsaved-dot {
             display: block;
+        }
+
+        .revision-badge {
+            display: none;
+            font-size: 12px;
+            padding: 3px 10px;
+            border-radius: 4px;
+            background: rgba(230, 160, 30, 0.15);
+            color: #e0a020;
+            border: 1px solid rgba(230, 160, 30, 0.3);
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .revision-badge.show {
+            display: inline-block;
         }
 
         .editor-panes {
@@ -1109,7 +1132,7 @@
 
         .editor-preview {
             padding: 20px;
-            max-width: var(--content-max-width);
+            max-width: none;
         }
 
         .editor-notify {
@@ -1982,15 +2005,17 @@
             </svg>
         </button>
         {% endif %}
+        <span class="revision-badge" id="revisionBadge"></span>
         <div class="editor-spacer"></div>
+        <button class="editor-btn" onclick="editorCancel()">Close</button>
+        <button class="editor-btn editor-btn-save" id="editorSaveBtn" onclick="editorSave()">Save</button>
         {% if not new_file_mode %}
         <button class="editor-btn editor-btn-destructive" onclick="editorDelete()">Delete</button>
         {% endif %}
         {% if has_history %}
+        <span class="header-separator"></span>
         <button class="editor-btn" id="editorHistoryBtn" onclick="toggleHistory()">History</button>
         {% endif %}
-        <button class="editor-btn" onclick="editorCancel()">Close</button>
-        <button class="editor-btn editor-btn-save" id="editorSaveBtn" onclick="editorSave()">Save</button>
         <img src="/static/mdlive.png" alt="mdlive" class="branding-logo">
     </div>
     <div class="editor-panes">
@@ -2131,19 +2156,27 @@
 
     // esc = cancel (only when not in filename input, and no dialog open)
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && document.activeElement !== document.getElementById('editorFilename')) {
-            var cd = document.getElementById('confirmDialog');
-            if (cd && cd.classList.contains('show')) return;
-            var fd = document.getElementById('fileDialog');
-            if (fd && fd.classList.contains('show')) return;
-            // close history panel if open
-            var historyPanel = document.getElementById('historyPanel');
-            if (historyPanel && historyPanel.classList.contains('show')) {
-                historyPanel.classList.remove('show');
-                return;
-            }
-            editorCancel();
+        if (e.key !== 'Escape') return;
+        if (document.activeElement === document.getElementById('editorFilename')) return;
+
+        // let modal handlers close their own dialogs first
+        var shortcuts = document.getElementById('shortcutsModal');
+        if (shortcuts && shortcuts.classList.contains('show')) return;
+        var cd = document.getElementById('confirmDialog');
+        if (cd && cd.classList.contains('show')) return;
+        var fd = document.getElementById('fileDialog');
+        if (fd && fd.classList.contains('show')) return;
+        var tm = document.getElementById('themeModal');
+        if (tm && tm.classList.contains('show')) return;
+
+        // close history panel if open
+        var historyPanel = document.getElementById('historyPanel');
+        if (historyPanel && historyPanel.classList.contains('show')) {
+            historyPanel.classList.remove('show');
+            return;
         }
+
+        editorCancel();
     });
 
     // ctrl/cmd+s anywhere on page
@@ -2208,6 +2241,8 @@
             }
             hasUnsavedChanges = false;
             updateUnsavedIndicator();
+            var badge = document.getElementById('revisionBadge');
+            if (badge) { badge.classList.remove('show'); badge.textContent = ''; }
             saveBtn.textContent = 'Saved';
             saveBtn.classList.add('saved');
             setTimeout(function() {
@@ -2390,6 +2425,10 @@
                 updatePreview();
                 hasUnsavedChanges = true;
                 updateUnsavedIndicator();
+                var d = new Date(parseInt(timestamp) * 1000);
+                var badge = document.getElementById('revisionBadge');
+                badge.textContent = 'Viewing revision: ' + d.toLocaleString();
+                badge.classList.add('show');
                 var panel = document.getElementById('historyPanel');
                 if (panel) panel.classList.remove('show');
             }
@@ -2457,6 +2496,10 @@
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
             </svg>
         </a>
+        {% if has_history %}
+        <span class="header-separator"></span>
+        <button class="editor-btn" onclick="toggleHistory()">History</button>
+        {% endif %}
         {% endif %}
         <img src="/static/mdlive.png" alt="mdlive" class="branding-logo">
     </div>
@@ -2464,6 +2507,90 @@
     {{ content }}
     </div>
 </div>
+
+{% if has_history and not editor_mode %}
+<div class="history-panel" id="historyPanel">
+    <div class="history-panel-header">
+        <span>Version History</span>
+        <button class="history-panel-close" onclick="toggleHistory()">x</button>
+    </div>
+    <div class="history-list" id="historyList"></div>
+</div>
+<script>
+(function() {
+    var filePath = {{ current_file|tojson }};
+
+    window.toggleHistory = function() {
+        var panel = document.getElementById('historyPanel');
+        if (!panel) return;
+        if (panel.classList.contains('show')) {
+            panel.classList.remove('show');
+            return;
+        }
+        panel.classList.add('show');
+        loadHistory();
+    };
+
+    function loadHistory() {
+        var list = document.getElementById('historyList');
+        if (!list) return;
+        list.innerHTML = '<div style="padding:16px;opacity:0.6">Loading...</div>';
+
+        fetch('/api/file_history?path=' + encodeURIComponent(filePath))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.entries || data.entries.length === 0) {
+                    list.innerHTML = '<div style="padding:16px;opacity:0.6">No history yet</div>';
+                    return;
+                }
+                list.innerHTML = '';
+                data.entries.forEach(function(entry) {
+                    var btn = document.createElement('button');
+                    btn.className = 'history-item';
+                    var d = new Date(parseInt(entry.timestamp) * 1000);
+                    var timeStr = d.toLocaleString();
+                    btn.innerHTML = '<div class="history-item-time">' + timeStr + '</div>' +
+                        '<div class="history-item-preview">' + escapeHtml(entry.preview) + '</div>';
+                    btn.onclick = function() { restoreVersion(entry.timestamp); };
+                    list.appendChild(btn);
+                });
+            })
+            .catch(function() {
+                list.innerHTML = '<div style="padding:16px;opacity:0.6">Failed to load history</div>';
+            });
+    }
+
+    function restoreVersion(timestamp) {
+        fetch('/api/restore_version', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: filePath, timestamp: timestamp })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.content !== undefined) {
+                // save restored content to the file, then reload
+                fetch('/api/save_file', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: filePath, content: data.content })
+                }).then(function() {
+                    window.location.reload();
+                });
+            }
+        })
+        .catch(function(err) { alert('Restore failed: ' + err.message); });
+    }
+
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+    }
+})();
+</script>
+{% endif %}
+
 {% endif %}
 
 <div class="theme-modal" id="themeModal">
@@ -2533,25 +2660,14 @@
         <h3>Keyboard Shortcuts</h3>
         <table class="shortcuts-table">
             <tr><td><span class="shortcuts-key">/</span></td><td>Show shortcuts</td></tr>
-            {% if show_navigation and not editor_mode %}
             <tr><td><span class="shortcuts-key">e</span></td><td>Edit file</td></tr>
-            {% endif %}
-            {% if show_navigation %}
             <tr><td><span class="shortcuts-key">n</span></td><td>New file</td></tr>
-            {% endif %}
-            {% if current_file and not editor_mode %}
             <tr><td><span class="shortcuts-key">d</span></td><td>Delete file</td></tr>
-            {% endif %}
-            {% if show_navigation %}
             <tr><td><span class="shortcuts-key">k</span></td><td>Toggle sidebar</td></tr>
             <tr><td><span class="shortcuts-key">s</span></td><td>Focus search</td></tr>
-            {% endif %}
-            {% if editor_mode %}
+            <tr><td><span class="shortcuts-key">Ctrl+S</span></td><td>Save</td></tr>
             <tr><td><span class="shortcuts-key">h</span></td><td>Toggle history</td></tr>
-            <tr><td><span class="shortcuts-key">Esc</span></td><td>Cancel editing</td></tr>
-            {% else %}
-            <tr><td><span class="shortcuts-key">Esc</span></td><td>Close modal / blur input</td></tr>
-            {% endif %}
+            <tr><td><span class="shortcuts-key">Esc</span></td><td>Close / cancel</td></tr>
         </table>
     </div>
 </div>
@@ -2615,7 +2731,7 @@ document.addEventListener('keydown', function(e) {
             }
             break;
         case 'h':
-            if ({{ editor_mode|default(false)|tojson }} && typeof toggleHistory === 'function') {
+            if (typeof toggleHistory === 'function') {
                 toggleHistory();
             }
             break;

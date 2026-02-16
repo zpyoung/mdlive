@@ -84,6 +84,8 @@ pub(crate) async fn render_markdown(
         return (StatusCode::NOT_FOUND, Html("File not found".to_string()));
     };
 
+    let has_history = state.mdlive_dir.is_some();
+
     let rendered = if state.show_navigation() {
         let filenames = state.get_sorted_filenames();
         let tree = build_file_tree(&filenames);
@@ -92,6 +94,7 @@ pub(crate) async fn render_markdown(
             content => content,
             mermaid_enabled => has_mermaid,
             show_navigation => true,
+            has_history => has_history,
             tree => tree,
             current_file => current_file,
         }) {
@@ -108,6 +111,7 @@ pub(crate) async fn render_markdown(
             content => content,
             mermaid_enabled => has_mermaid,
             show_navigation => false,
+            has_history => has_history,
             current_file => current_file,
         }) {
             Ok(r) => r,
