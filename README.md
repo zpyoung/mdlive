@@ -8,11 +8,26 @@ I built this to sit next to AI coding agents. When an agent writes markdown -- p
 
 This started as a fork of Jose Fernandez's [mdserve](https://github.com/jfernandez/mdserve). The original idea and core implementation are his. I've since taken it in a different direction: in-browser editing, file CRUD, version history, keyboard shortcuts, theming. Different enough to warrant its own repo.
 
-## Quick start
+## Install
+
+From crates.io:
 
 ```bash
 cargo install mdlive
 ```
+
+From source:
+
+```bash
+git clone https://github.com/bearded-giant/mdlive.git
+cd mdlive
+cargo build --release
+# binary is at target/release/mdlive
+```
+
+Single binary, no runtime dependencies. Everything (templates, JS libraries, images) is embedded at compile time.
+
+## Quick start
 
 ```bash
 mdlive README.md         # single file, opens browser
@@ -21,15 +36,29 @@ mdlive docs/             # directory mode with sidebar
 
 It watches for changes and reloads instantly via WebSocket. New files in directory mode get picked up automatically. The browser opens on launch by default (pass `--no-open` to suppress).
 
+### Running alongside an AI agent
+
+Point mdlive at whatever directory the agent writes to. As the agent creates or updates markdown files, the browser reflects changes in real time.
+
+```bash
+mdlive scratch/ &        # background it, work alongside your agent
+```
+
+This is particularly useful for reviewing agent-generated plans, design docs, and research as they're being written.
+
 ## Features
 
 ### Viewing
 
-GFM rendering with tables, task lists, strikethrough, and fenced code blocks. Syntax highlighting via highlight.js. Mermaid diagram rendering. YAML and TOML frontmatter is stripped before rendering. Five themes including three Catppuccin variants, selectable from a palette modal.
+GFM rendering with tables, task lists, strikethrough, and fenced code blocks. Syntax highlighting via highlight.js. Mermaid diagram rendering. YAML and TOML frontmatter is stripped before rendering. Images referenced in markdown are served inline (png, jpg, gif, svg, webp).
+
+### Themes
+
+Five built-in themes: Catppuccin Mocha (default), Catppuccin Macchiato, Catppuccin Latte, Light, and Dark. Switch via the palette icon in the bottom-right corner. Selection is persisted to localStorage.
 
 ### Editing
 
-Every markdown file has a built-in editor accessible via the edit icon or the `e` shortcut. The editor is a split-pane view: raw markdown on the left, live preview on the right. The divider is draggable (persisted to localStorage). Scroll position syncs between panes. An unsaved-changes dot and `beforeunload` guard prevent accidental data loss.
+Every markdown file has a built-in editor accessible via the edit icon or the `e` shortcut. The editor is a split-pane view: raw markdown on the left, live preview on the right. The divider is draggable (persisted to localStorage). Scroll position syncs between panes. `Ctrl+S` saves, `Esc` closes. An unsaved-changes dot and `beforeunload` guard prevent accidental data loss.
 
 ### File operations
 
@@ -37,7 +66,7 @@ Full CRUD from the browser. Create new files, rename/move existing ones, delete 
 
 ### Version history
 
-Every save creates a timestamped snapshot. Open the history panel in the editor (`h` shortcut or History button) to browse previous versions and restore any of them.
+Every save creates a timestamped snapshot in a `.mdlive/` directory next to your files. Open the history panel (`h` shortcut or History button) to browse previous versions and restore any of them. You'll probably want to add `.mdlive` to your `.gitignore` unless you want doc history in your repo -- which can actually be handy for shared design docs or architecture decisions.
 
 ### Directory mode
 
@@ -45,21 +74,19 @@ Pass a directory and mdlive recursively finds all `.md` and `.markdown` files, b
 
 ### Keyboard shortcuts
 
-Press `/` to see all available shortcuts in a modal. Shortcuts are context-aware -- the modal only shows what's relevant to your current mode.
+Press `/` to see all available shortcuts. Shortcuts are suppressed when typing in inputs, when modifier keys are held, and when dialogs are open.
 
-| Key | Action | Context |
-|-----|--------|---------|
-| `/` | Show shortcuts | Always |
-| `e` | Edit file | View mode |
-| `n` | New file | Directory mode |
-| `d` | Delete file | View mode |
-| `k` | Toggle sidebar | Directory mode |
-| `s` | Focus search | Directory mode |
-| `Ctrl+S` | Save | Editor mode |
-| `h` | Toggle history | Editor mode |
-| `Esc` | Close editor / cancel / blur | Always |
-
-Shortcuts are suppressed when typing in inputs, when modifier keys are held, and when dialogs are open.
+| Key | Action |
+|-----|--------|
+| `/` | Show shortcuts |
+| `e` | Edit file |
+| `n` | New file |
+| `d` | Delete file |
+| `k` | Toggle sidebar |
+| `s` | Focus search |
+| `Ctrl+S` | Save |
+| `h` | Toggle history |
+| `Esc` | Close / cancel |
 
 ## Usage
 
