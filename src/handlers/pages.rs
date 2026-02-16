@@ -108,6 +108,7 @@ pub(crate) async fn render_markdown(
             content => content,
             mermaid_enabled => has_mermaid,
             show_navigation => false,
+            current_file => current_file,
         }) {
             Ok(r) => r,
             Err(e) => {
