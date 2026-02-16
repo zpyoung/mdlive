@@ -9,7 +9,7 @@ use axum_test::TestServer;
 
 #[tokio::test]
 async fn test_server_starts_and_serves_basic_markdown() {
-    let (server, _temp_file) = create_test_server("# Hello World\n\nThis is **bold** text.").await;
+    let (server, _, _dir) = create_test_server("# Hello World\n\nThis is **bold** text.").await;
 
     let response = server.get("/").await;
 
@@ -45,7 +45,7 @@ fn main() {
 ```
 "#;
 
-    let (server, _temp_file) = create_test_server(markdown_content).await;
+    let (server, _, _dir) = create_test_server(markdown_content).await;
 
     let response = server.get("/").await;
 
@@ -62,7 +62,7 @@ fn main() {
 
 #[tokio::test]
 async fn test_404_for_unknown_routes() {
-    let (server, _temp_file) = create_test_server("# 404 Test").await;
+    let (server, _, _dir) = create_test_server("# 404 Test").await;
 
     let response = server.get("/unknown-route").await;
 
@@ -83,7 +83,7 @@ This markdown contains HTML tags:
 Regular **markdown** still works.
 "#;
 
-    let (server, _temp_file) = create_test_server(markdown_content).await;
+    let (server, _, _dir) = create_test_server(markdown_content).await;
 
     let response = server.get("/").await;
 
@@ -100,7 +100,7 @@ Regular **markdown** still works.
 
 #[tokio::test]
 async fn test_yaml_frontmatter_is_stripped() {
-    let (server, _temp_file) = create_test_server(YAML_FRONTMATTER_CONTENT).await;
+    let (server, _, _dir) = create_test_server(YAML_FRONTMATTER_CONTENT).await;
 
     let response = server.get("/").await;
 
@@ -114,7 +114,7 @@ async fn test_yaml_frontmatter_is_stripped() {
 
 #[tokio::test]
 async fn test_toml_frontmatter_is_stripped() {
-    let (server, _temp_file) = create_test_server(TOML_FRONTMATTER_CONTENT).await;
+    let (server, _, _dir) = create_test_server(TOML_FRONTMATTER_CONTENT).await;
 
     let response = server.get("/").await;
 
@@ -255,7 +255,7 @@ async fn test_same_dir_image_still_works_with_wildcard_route() {
 
 #[tokio::test]
 async fn test_single_file_mode_no_navigation_sidebar() {
-    let (server, _temp_file) = create_test_server("# Single File Test").await;
+    let (server, _, _dir) = create_test_server("# Single File Test").await;
 
     let response = server.get("/").await;
     assert_eq!(response.status_code(), 200);
@@ -457,7 +457,7 @@ async fn test_context_menu_elements_in_directory_mode() {
 
 #[tokio::test]
 async fn test_context_menu_not_in_single_file_mode() {
-    let (server, _temp_file) = create_test_server("# Single").await;
+    let (server, _, _dir) = create_test_server("# Single").await;
 
     let response = server.get("/").await;
     let body = response.text();
@@ -489,7 +489,7 @@ console.log("Hello World");
 ```
 "#;
 
-    let (server, _temp_file) = create_test_server(markdown_content).await;
+    let (server, _, _dir) = create_test_server(markdown_content).await;
 
     let response = server.get("/").await;
 
@@ -531,7 +531,7 @@ echo "Regular code block"
 Just regular markdown content.
 "#;
 
-    let (server, _temp_file) = create_test_server(markdown_content).await;
+    let (server, _, _dir) = create_test_server(markdown_content).await;
 
     let response = server.get("/").await;
 
@@ -568,7 +568,7 @@ classDiagram
 ```
 "#;
 
-    let (server, _temp_file) = create_test_server(markdown_content).await;
+    let (server, _, _dir) = create_test_server(markdown_content).await;
 
     let response = server.get("/").await;
 
@@ -594,7 +594,7 @@ classDiagram
 
 #[tokio::test]
 async fn test_mermaid_js_etag_caching() {
-    let (server, _temp_file) = create_test_server("# Test").await;
+    let (server, _, _dir) = create_test_server("# Test").await;
 
     let response = server.get("/mermaid.min.js").await;
     assert_eq!(response.status_code(), 200);

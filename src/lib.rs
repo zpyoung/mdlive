@@ -173,16 +173,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_bind_with_port_increment_uses_requested_port_when_free() {
-        let tmp = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
-        let free_port = tmp.local_addr().unwrap().port();
-        drop(tmp);
-
-        let (listener, actual_port) = bind_with_port_increment("127.0.0.1", free_port)
-            .await
-            .unwrap();
-
-        assert_eq!(actual_port, free_port);
-        assert_eq!(listener.local_addr().unwrap().port(), free_port);
+        // pick a high port unlikely to collide, retry a few times to handle CI flakiness
+        for candidate in 59123..59133 {
+            if let Ok((listener, actual_port)) =
+                bind_with_port_increment("127.0.0.1", candidate).await
+            {
+                assert_eq!(actual_port, candidate);
+                assert_eq!(listener.local_addr().unwrap().port(), candidate);
+                return;
+            }
+        }
+        panic!("could not find a free port in range 59123..59133");
     }
 
     #[tokio::test]

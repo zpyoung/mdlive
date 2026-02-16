@@ -7,7 +7,7 @@ use std::time::Duration;
 
 #[tokio::test]
 async fn test_websocket_connection() {
-    let (server, _temp_file) = create_test_server_with_http("# WebSocket Test").await;
+    let (server, _, _dir) = create_test_server_with_http("# WebSocket Test").await;
 
     let response = server.get_websocket("/ws").await;
     response.assert_status_switching_protocols();
@@ -15,11 +15,11 @@ async fn test_websocket_connection() {
 
 #[tokio::test]
 async fn test_file_modification_updates_via_websocket() {
-    let (server, temp_file) = create_test_server_with_http("# Original Content").await;
+    let (server, file_path, _dir) = create_test_server_with_http("# Original Content").await;
 
     let mut websocket = server.get_websocket("/ws").await.into_websocket().await;
 
-    fs::write(&temp_file, "# Modified Content").expect("Failed to modify file");
+    fs::write(&file_path, "# Modified Content").expect("Failed to modify file");
 
     tokio::time::sleep(Duration::from_millis(FILE_WATCH_DELAY_MS)).await;
 
@@ -125,9 +125,9 @@ async fn test_directory_mode_new_file_triggers_reload() {
 
 #[tokio::test]
 async fn test_editor_save_simulation_single_file_mode() {
-    let (server, temp_file) = create_test_server_with_http("# Original\n\nOriginal content").await;
+    let (server, file_path, _dir) =
+        create_test_server_with_http("# Original\n\nOriginal content").await;
 
-    let file_path = temp_file.path().to_path_buf();
     let backup_path = file_path.with_extension("md~");
 
     let initial_response = server.get("/").await;
@@ -243,11 +243,11 @@ async fn test_no_404_during_editor_save_sequence() {
 
 #[tokio::test]
 async fn test_temp_file_rename_triggers_reload_single_file_mode() {
-    let (server, temp_file) = create_test_server_with_http("# Original\n\nOriginal content").await;
+    let (server, file_path, _dir) =
+        create_test_server_with_http("# Original\n\nOriginal content").await;
 
     let mut websocket = server.get_websocket("/ws").await.into_websocket().await;
 
-    let file_path = temp_file.path().to_path_buf();
     let temp_write_path = file_path.with_extension("md.tmp.12345");
 
     let initial_response = server.get("/").await;
