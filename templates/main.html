@@ -2062,6 +2062,33 @@
         }
     }
 
+    // check for ?restore=TIMESTAMP from view-mode history
+    var restoreParam = new URLSearchParams(window.location.search).get('restore');
+    if (restoreParam && filePath) {
+        fetch('/api/restore_version', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: filePath, timestamp: restoreParam })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.content !== undefined) {
+                textarea.value = data.content;
+                updatePreview();
+                hasUnsavedChanges = true;
+                updateUnsavedIndicator();
+                var d = new Date(parseInt(restoreParam) * 1000);
+                var badge = document.getElementById('revisionBadge');
+                if (badge) {
+                    badge.textContent = 'Viewing revision: ' + d.toLocaleString();
+                    badge.classList.add('show');
+                }
+            }
+        });
+        // clean up URL without reload
+        history.replaceState(null, '', window.location.pathname);
+    }
+
     window.addEventListener('beforeunload', function(e) {
         if (hasUnsavedChanges) {
             e.preventDefault();
@@ -2250,6 +2277,12 @@
                 saveBtn.classList.remove('saved');
                 saveBtn.disabled = false;
             }, 1500);
+
+            // refresh history panel if open
+            var hp = document.getElementById('historyPanel');
+            if (hp && hp.classList.contains('show')) {
+                loadHistory();
+            }
 
             // if new file, redirect to edit existing
             if (isNewFile) {
@@ -2561,25 +2594,8 @@
     }
 
     function restoreVersion(timestamp) {
-        fetch('/api/restore_version', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ path: filePath, timestamp: timestamp })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.content !== undefined) {
-                // save restored content to the file, then reload
-                fetch('/api/save_file', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path: filePath, content: data.content })
-                }).then(function() {
-                    window.location.reload();
-                });
-            }
-        })
-        .catch(function(err) { alert('Restore failed: ' + err.message); });
+        // open editor with this revision loaded
+        window.location.href = '/edit/' + filePath + '?restore=' + timestamp;
     }
 
     function escapeHtml(str) {

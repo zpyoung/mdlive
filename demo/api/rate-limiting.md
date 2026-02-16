@@ -2,7 +2,6 @@
 
 The API enforces rate limits to protect shared infrastructure.
 
-
 ## Limits
 
 | Tier | Requests/min | Burst |
