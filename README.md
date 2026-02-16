@@ -55,8 +55,9 @@ Press `/` to see all available shortcuts in a modal. Shortcuts are context-aware
 | `d` | Delete file | View mode |
 | `k` | Toggle sidebar | Directory mode |
 | `s` | Focus search | Directory mode |
+| `Ctrl+S` | Save | Editor mode |
 | `h` | Toggle history | Editor mode |
-| `Esc` | Cancel / close / blur | Always |
+| `Esc` | Close editor / cancel / blur | Always |
 
 Shortcuts are suppressed when typing in inputs, when modifier keys are held, and when dialogs are open.
 

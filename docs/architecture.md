@@ -46,9 +46,9 @@ src/
   state.rs          -- MarkdownState, TrackedFile, SharedMarkdownState
   router.rs         -- new_router(), route registration, watcher setup
   handlers/
-    pages.rs        -- serve_html_root, serve_file, render_markdown
-    api.rs          -- CRUD endpoints (raw content, delete, move, create)
-    static_files.rs -- embedded JS serving with ETag caching
+    pages.rs        -- serve_html_root, serve_file, serve_editor, serve_new_file_editor
+    api.rs          -- CRUD endpoints, save, version history, restore
+    static_files.rs -- embedded JS/image serving with ETag caching
     websocket.rs    -- WebSocket handler for live reload
   watcher.rs        -- file event handling (notify crate)
   tree.rs           -- build_file_tree (pure data transform)
@@ -107,28 +107,57 @@ Events handled:
 ## Routing
 
 Single unified router (router.rs) handles both modes:
+
+### Pages
 - `GET /` -> first file alphabetically
-- `GET /:filename` -> markdown files or images
-- `GET /ws` -> WebSocket connection
-- `GET /mermaid.min.js` -> bundled Mermaid library
-- `GET /highlight.min.js` -> bundled highlight.js
-- `GET /api/raw_content` -> raw markdown content
+- `GET /new` -> new file editor
+- `GET /edit/:filepath` -> editor for existing file
+- `GET /:filepath` -> rendered markdown or images
+
+### WebSocket
+- `GET /ws` -> live reload connection
+
+### API
+- `GET /api/raw_content` -> raw markdown for a file
+- `POST /api/create_file` -> create a new markdown file
+- `POST /api/save_file` -> save file content (creates history snapshot)
 - `POST /api/delete_file` -> delete a tracked file
 - `POST /api/move_file` -> rename/move a tracked file
-- `POST /api/create_file` -> create a new markdown file
+- `GET /api/file_history` -> list saved versions for a file
+- `POST /api/restore_version` -> retrieve content from a past version
+
+### Static assets
+- `GET /mermaid.min.js` -> bundled Mermaid library
+- `GET /highlight.min.js` -> bundled highlight.js
+- `GET /marked.min.js` -> bundled marked parser (editor preview)
+- `GET /static/mdlive.png` -> branding logo
+- `GET /static/favicon.png` -> favicon
+- `GET /static/md.png` -> markdown icon
 
 Directory traversal blocked by `canonicalize` + `starts_with(base_dir)` validation.
+
+## Editor
+
+The editor is a split-pane view: raw markdown textarea on the left, live HTML preview on the right. The divider is draggable and its position is persisted to localStorage.
+
+Save creates a timestamped snapshot in `.mdlive_history/{filename}/` alongside the base directory. The history panel lists snapshots and any can be restored into the editor. A revision badge in the header indicates when viewing a past version.
+
+Client-side preview uses marked.js to render markdown without a server round-trip. Mermaid diagrams and syntax highlighting are applied in the preview pane.
 
 ## Rendering
 
 Uses [MiniJinja](https://github.com/mitsuhiko/minijinja) with templates embedded
 at compile time via `minijinja_embed`. Single template (`main.html`) handles both
-modes via conditional blocks.
+modes and editor/view states via conditional blocks.
 
 Template variables:
 - `content`: pre-rendered markdown HTML
+- `raw_content`: raw markdown (editor mode)
 - `mermaid_enabled`: conditionally includes Mermaid.js
 - `show_navigation`: controls sidebar visibility
+- `editor_mode`: toggles editor vs read-only view
+- `new_file_mode`: new file creation variant of editor
+- `has_history`: whether history snapshots exist
 - `tree`: nested tree of files and directories
 - `current_file`: active file's relative path
 
@@ -142,4 +171,4 @@ Template variables:
 
 **No file removal on delete**: editors save via rename-to-backup then create-new. Removing on delete would cause transient 404s.
 
-**Server-side logic**: most logic lives server-side. Client JS minimal (theme, reload, Mermaid rendering).
+**Server-side rendering, client-side editor preview**: view mode serves pre-rendered HTML from memory. Editor mode uses marked.js on the client for instant preview without round-trips.
