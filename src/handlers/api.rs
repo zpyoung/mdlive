@@ -7,6 +7,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::state::{ServerMessage, SharedMarkdownState};
 use crate::util::is_markdown_file;
@@ -31,6 +32,44 @@ pub(crate) struct MoveFileRequest {
 pub(crate) struct CreateFileRequest {
     path: String,
     content: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct SaveFileRequest {
+    path: String,
+    content: String,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct FileHistoryQuery {
+    path: String,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct RestoreVersionRequest {
+    path: String,
+    timestamp: String,
+}
+
+#[derive(Serialize)]
+pub(crate) struct HistoryEntry {
+    timestamp: String,
+    preview: String,
+}
+
+#[derive(Serialize)]
+pub(crate) struct HistoryResponse {
+    success: bool,
+    entries: Vec<HistoryEntry>,
+}
+
+#[derive(Serialize)]
+pub(crate) struct RestoreResponse {
+    success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -315,4 +354,176 @@ pub(crate) async fn api_create_file(
             path: Some(body.path),
         }),
     ))
+}
+
+pub(crate) async fn api_save_file(
+    State(state): State<SharedMarkdownState>,
+    Json(body): Json<SaveFileRequest>,
+) -> Result<Json<ApiResponse>, (StatusCode, Json<ApiResponse>)> {
+    let mut state = state.lock().await;
+    let canonical = validate_existing_path(&state.base_dir, &body.path)?;
+
+    if !state.tracked_files.contains_key(&body.path) {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse {
+                success: false,
+                error: Some("file not tracked".to_string()),
+                path: None,
+            }),
+        ));
+    }
+
+    // snapshot current content before overwriting
+    if let Some(mdlive_dir) = &state.mdlive_dir {
+        snapshot_file(&canonical, &body.path, mdlive_dir);
+    }
+
+    fs::write(&canonical, &body.content).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse {
+                success: false,
+                error: Some(format!("failed to write: {e}")),
+                path: None,
+            }),
+        )
+    })?;
+
+    let _ = state.refresh_file(&body.path);
+    let _ = state.change_tx.send(ServerMessage::Reload);
+
+    Ok(Json(ApiResponse {
+        success: true,
+        error: None,
+        path: Some(body.path),
+    }))
+}
+
+fn snapshot_file(canonical: &Path, relative: &str, mdlive_dir: &Path) {
+    let Ok(old_content) = fs::read_to_string(canonical) else {
+        return;
+    };
+
+    let history_dir = mdlive_dir.join("history").join(relative);
+    if fs::create_dir_all(&history_dir).is_err() {
+        return;
+    }
+
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let snapshot_path = history_dir.join(format!("{timestamp}.md"));
+    let _ = fs::write(snapshot_path, old_content);
+
+    // prune to 20 snapshots
+    if let Ok(entries) = fs::read_dir(&history_dir) {
+        let mut files: Vec<PathBuf> = entries
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().is_some_and(|ext| ext == "md"))
+            .collect();
+        if files.len() > 20 {
+            files.sort();
+            for old in &files[..files.len() - 20] {
+                let _ = fs::remove_file(old);
+            }
+        }
+    }
+}
+
+pub(crate) async fn api_file_history(
+    Query(params): Query<FileHistoryQuery>,
+    State(state): State<SharedMarkdownState>,
+) -> Result<Json<HistoryResponse>, (StatusCode, Json<ApiResponse>)> {
+    let state = state.lock().await;
+    validate_existing_path(&state.base_dir, &params.path)?;
+
+    let mdlive_dir = match &state.mdlive_dir {
+        Some(d) => d,
+        None => {
+            return Ok(Json(HistoryResponse {
+                success: true,
+                entries: vec![],
+            }));
+        }
+    };
+
+    let history_dir = mdlive_dir.join("history").join(&params.path);
+    let mut entries = Vec::new();
+
+    if let Ok(dir_entries) = fs::read_dir(&history_dir) {
+        for entry in dir_entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_none_or(|ext| ext != "md") {
+                continue;
+            }
+            let timestamp = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string();
+            let preview = fs::read_to_string(&path)
+                .unwrap_or_default()
+                .lines()
+                .next()
+                .unwrap_or("")
+                .chars()
+                .take(80)
+                .collect();
+            entries.push(HistoryEntry { timestamp, preview });
+        }
+    }
+
+    entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+    Ok(Json(HistoryResponse {
+        success: true,
+        entries,
+    }))
+}
+
+pub(crate) async fn api_restore_version(
+    State(state): State<SharedMarkdownState>,
+    Json(body): Json<RestoreVersionRequest>,
+) -> Result<Json<RestoreResponse>, (StatusCode, Json<ApiResponse>)> {
+    let state = state.lock().await;
+    validate_existing_path(&state.base_dir, &body.path)?;
+
+    let mdlive_dir = match &state.mdlive_dir {
+        Some(d) => d,
+        None => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(ApiResponse {
+                    success: false,
+                    error: Some("history not available".to_string()),
+                    path: None,
+                }),
+            ));
+        }
+    };
+
+    let snapshot_path = mdlive_dir
+        .join("history")
+        .join(&body.path)
+        .join(format!("{}.md", body.timestamp));
+
+    let content = fs::read_to_string(&snapshot_path).map_err(|_| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse {
+                success: false,
+                error: Some("version not found".to_string()),
+                path: None,
+            }),
+        )
+    })?;
+
+    Ok(Json(RestoreResponse {
+        success: true,
+        content: Some(content),
+        error: None,
+    }))
 }

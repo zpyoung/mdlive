@@ -50,6 +50,7 @@ pub fn new_router(
     let router = Router::new()
         .route("/", get(handlers::pages::serve_html_root))
         .route("/ws", get(handlers::websocket::websocket_handler))
+        .route("/new", get(handlers::pages::serve_new_file_editor))
         .route(
             "/mermaid.min.js",
             get(handlers::static_files::serve_mermaid_js),
@@ -58,10 +59,21 @@ pub fn new_router(
             "/highlight.min.js",
             get(handlers::static_files::serve_highlight_js),
         )
+        .route(
+            "/marked.min.js",
+            get(handlers::static_files::serve_marked_js),
+        )
         .route("/api/raw_content", get(handlers::api::api_raw_content))
         .route("/api/delete_file", post(handlers::api::api_delete_file))
         .route("/api/move_file", post(handlers::api::api_move_file))
         .route("/api/create_file", post(handlers::api::api_create_file))
+        .route("/api/save_file", post(handlers::api::api_save_file))
+        .route("/api/file_history", get(handlers::api::api_file_history))
+        .route(
+            "/api/restore_version",
+            post(handlers::api::api_restore_version),
+        )
+        .route("/edit/*filepath", get(handlers::pages::serve_editor))
         .route("/*filepath", get(handlers::pages::serve_file))
         .layer(CorsLayer::permissive())
         .with_state(state);

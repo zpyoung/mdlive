@@ -30,6 +30,7 @@ pub(crate) struct MarkdownState {
     pub(crate) tracked_files: HashMap<String, TrackedFile>,
     pub(crate) is_directory_mode: bool,
     pub(crate) change_tx: broadcast::Sender<ServerMessage>,
+    pub(crate) mdlive_dir: Option<PathBuf>,
 }
 
 impl MarkdownState {
@@ -64,11 +65,21 @@ impl MarkdownState {
             );
         }
 
+        let mdlive_dir = if is_directory_mode {
+            let dir = base_dir.join(".mdlive");
+            let history = dir.join("history");
+            let _ = fs::create_dir_all(&history);
+            Some(dir)
+        } else {
+            None
+        };
+
         Ok(MarkdownState {
             base_dir,
             tracked_files,
             is_directory_mode,
             change_tx,
+            mdlive_dir,
         })
     }
 

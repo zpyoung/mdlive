@@ -2,6 +2,8 @@ mod common;
 
 use common::*;
 use std::fs;
+use std::thread;
+use std::time::Duration;
 
 #[tokio::test]
 async fn test_api_raw_content() {
@@ -196,4 +198,196 @@ async fn test_api_create_file_non_md_extension() {
         .json(&serde_json::json!({"path": "script.sh"}))
         .await;
     assert_eq!(response.status_code(), 400);
+}
+
+// save_file tests
+
+#[tokio::test]
+async fn test_api_save_file() {
+    let (server, temp_dir) = create_directory_server().await;
+
+    let response = server
+        .post("/api/save_file")
+        .json(&serde_json::json!({"path": "test1.md", "content": "# Updated\n\nNew content"}))
+        .await;
+    assert_eq!(response.status_code(), 200);
+    let body: serde_json::Value = response.json();
+    assert_eq!(body["success"], true);
+
+    let content = fs::read_to_string(temp_dir.path().join("test1.md")).unwrap();
+    assert_eq!(content, "# Updated\n\nNew content");
+}
+
+#[tokio::test]
+async fn test_api_save_file_not_tracked() {
+    let (server, _temp_dir) = create_directory_server().await;
+
+    let response = server
+        .post("/api/save_file")
+        .json(&serde_json::json!({"path": "nonexistent.md", "content": "test"}))
+        .await;
+    assert_eq!(response.status_code(), 404);
+}
+
+#[tokio::test]
+async fn test_api_save_file_traversal_blocked() {
+    let (server, _temp_dir) = create_directory_server().await;
+
+    let response = server
+        .post("/api/save_file")
+        .json(&serde_json::json!({"path": "../../../etc/passwd", "content": "test"}))
+        .await;
+    assert_eq!(response.status_code(), 403);
+}
+
+#[tokio::test]
+async fn test_api_save_file_creates_history_snapshot() {
+    let (server, temp_dir) = create_directory_server().await;
+
+    let response = server
+        .post("/api/save_file")
+        .json(&serde_json::json!({"path": "test1.md", "content": "# Updated content"}))
+        .await;
+    assert_eq!(response.status_code(), 200);
+
+    let history_dir = temp_dir.path().join(".mdlive/history/test1.md");
+    assert!(history_dir.exists(), "history directory should exist");
+    let entries: Vec<_> = fs::read_dir(&history_dir).unwrap().collect();
+    assert_eq!(entries.len(), 1, "should have one snapshot");
+
+    let snapshot = entries[0].as_ref().unwrap();
+    let snapshot_content = fs::read_to_string(snapshot.path()).unwrap();
+    assert_eq!(snapshot_content, TEST_FILE_1_CONTENT);
+}
+
+#[tokio::test]
+async fn test_api_file_history() {
+    let (server, _temp_dir) = create_directory_server().await;
+
+    server
+        .post("/api/save_file")
+        .json(&serde_json::json!({"path": "test1.md", "content": "# Version 2"}))
+        .await;
+    thread::sleep(Duration::from_millis(1100));
+    server
+        .post("/api/save_file")
+        .json(&serde_json::json!({"path": "test1.md", "content": "# Version 3"}))
+        .await;
+
+    let response = server.get("/api/file_history?path=test1.md").await;
+    assert_eq!(response.status_code(), 200);
+    let body: serde_json::Value = response.json();
+    assert_eq!(body["success"], true);
+
+    let entries = body["entries"].as_array().unwrap();
+    assert_eq!(entries.len(), 2, "should have two history entries");
+
+    let ts0: u64 = entries[0]["timestamp"].as_str().unwrap().parse().unwrap();
+    let ts1: u64 = entries[1]["timestamp"].as_str().unwrap().parse().unwrap();
+    assert!(ts0 >= ts1, "entries should be newest first");
+}
+
+#[tokio::test]
+async fn test_api_restore_version() {
+    let (server, _temp_dir) = create_directory_server().await;
+
+    server
+        .post("/api/save_file")
+        .json(&serde_json::json!({"path": "test1.md", "content": "# New content"}))
+        .await;
+
+    let history_response = server.get("/api/file_history?path=test1.md").await;
+    let history: serde_json::Value = history_response.json();
+    let timestamp = history["entries"][0]["timestamp"].as_str().unwrap();
+
+    let response = server
+        .post("/api/restore_version")
+        .json(&serde_json::json!({"path": "test1.md", "timestamp": timestamp}))
+        .await;
+    assert_eq!(response.status_code(), 200);
+    let body: serde_json::Value = response.json();
+    assert_eq!(body["success"], true);
+    assert_eq!(body["content"], TEST_FILE_1_CONTENT);
+}
+
+// editor page tests
+
+#[tokio::test]
+async fn test_editor_page_for_existing_file() {
+    let (server, _temp_dir) = create_directory_server().await;
+
+    let response = server.get("/edit/test1.md").await;
+    assert_eq!(response.status_code(), 200);
+    let body = response.text();
+    assert!(
+        body.contains("editorTextarea"),
+        "should contain editor textarea"
+    );
+    assert!(body.contains("marked.min.js"), "should include marked.js");
+    assert!(body.contains("Test 1"), "should contain raw content");
+}
+
+#[tokio::test]
+async fn test_editor_page_not_found() {
+    let (server, _temp_dir) = create_directory_server().await;
+
+    let response = server.get("/edit/nonexistent.md").await;
+    assert_eq!(response.status_code(), 404);
+}
+
+#[tokio::test]
+async fn test_new_file_editor_page() {
+    let (server, _temp_dir) = create_directory_server().await;
+
+    let response = server.get("/new?dir=").await;
+    assert_eq!(response.status_code(), 200);
+    let body = response.text();
+    assert!(
+        body.contains("editorFilename"),
+        "should have filename input"
+    );
+    assert!(
+        body.contains("editorTextarea"),
+        "should contain editor textarea"
+    );
+}
+
+#[tokio::test]
+async fn test_new_file_editor_with_dir() {
+    let (server, _temp_dir) = create_directory_server().await;
+
+    let response = server.get("/new?dir=subdir").await;
+    assert_eq!(response.status_code(), 200);
+    let body = response.text();
+    // minijinja auto-escapes / as &#x2f; in attribute values
+    assert!(
+        body.contains("subdir/new.md") || body.contains("subdir&#x2f;new.md"),
+        "should have default path with dir prefix"
+    );
+}
+
+#[tokio::test]
+async fn test_editor_sidebar_has_edit_icons() {
+    let (server, _temp_dir) = create_directory_server().await;
+
+    let response = server.get("/test1.md").await;
+    assert_eq!(response.status_code(), 200);
+    let body = response.text();
+    assert!(body.contains("edit-icon"), "sidebar should have edit icons");
+    assert!(
+        body.contains("/edit/test1.md"),
+        "edit icon should link to editor"
+    );
+}
+
+#[tokio::test]
+async fn test_editor_context_menu_has_edit() {
+    let (server, _temp_dir) = create_directory_server().await;
+
+    let response = server.get("/test1.md").await;
+    let body = response.text();
+    assert!(
+        body.contains("'Edit'"),
+        "context menu JS should include Edit option"
+    );
 }
