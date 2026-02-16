@@ -5,7 +5,7 @@ use axum::{
 use std::fs;
 
 use crate::state::SharedMarkdownState;
-use crate::template::{HIGHLIGHT_JS, MARKED_JS, MD_ICON_PNG, MDLIVE_LOGO_PNG, MERMAID_JS, STATIC_ETAG};
+use crate::template::{FAVICON_PNG, HIGHLIGHT_JS, MARKED_JS, MD_ICON_PNG, MDLIVE_LOGO_PNG, MERMAID_JS, STATIC_ETAG};
 use crate::util::guess_image_content_type;
 
 pub(crate) async fn serve_mermaid_js(headers: HeaderMap) -> impl IntoResponse {
@@ -38,6 +38,10 @@ fn serve_embedded_js(headers: &HeaderMap, content: &'static str) -> Response {
 
 pub(crate) async fn serve_md_icon(headers: HeaderMap) -> impl IntoResponse {
     serve_embedded_image(&headers, MD_ICON_PNG)
+}
+
+pub(crate) async fn serve_favicon(headers: HeaderMap) -> impl IntoResponse {
+    serve_embedded_image(&headers, FAVICON_PNG)
 }
 
 pub(crate) async fn serve_mdlive_logo(headers: HeaderMap) -> impl IntoResponse {

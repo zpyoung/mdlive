@@ -68,6 +68,10 @@ pub fn new_router(
             get(handlers::static_files::serve_md_icon),
         )
         .route(
+            "/static/favicon.png",
+            get(handlers::static_files::serve_favicon),
+        )
+        .route(
             "/static/mdlive.png",
             get(handlers::static_files::serve_mdlive_logo),
         )
