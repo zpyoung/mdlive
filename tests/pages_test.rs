@@ -456,14 +456,15 @@ async fn test_context_menu_elements_in_directory_mode() {
 }
 
 #[tokio::test]
-async fn test_context_menu_not_in_single_file_mode() {
+async fn test_context_menu_in_single_file_mode() {
     let (server, _, _dir) = create_test_server("# Single").await;
 
     let response = server.get("/").await;
     let body = response.text();
 
-    assert!(!body.contains(r#"id="contextMenu""#));
-    assert!(!body.contains(r#"id="fileDialog""#));
+    // context menu is available in single-file mode for edit and copy operations
+    assert!(body.contains(r#"id="contextMenu""#));
+    assert!(body.contains(r#"id="fileDialog""#));
 }
 
 // --- mermaid tests ---

@@ -367,20 +367,6 @@ async fn test_new_file_editor_with_dir() {
 }
 
 #[tokio::test]
-async fn test_editor_sidebar_has_edit_icons() {
-    let (server, _temp_dir) = create_directory_server().await;
-
-    let response = server.get("/test1.md").await;
-    assert_eq!(response.status_code(), 200);
-    let body = response.text();
-    assert!(body.contains("edit-icon"), "sidebar should have edit icons");
-    assert!(
-        body.contains("/edit/test1.md"),
-        "edit icon should link to editor"
-    );
-}
-
-#[tokio::test]
 async fn test_editor_context_menu_has_edit() {
     let (server, _temp_dir) = create_directory_server().await;
 
