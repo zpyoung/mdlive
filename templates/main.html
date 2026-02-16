@@ -707,6 +707,90 @@
             opacity: 0.8;
         }
 
+        .shortcuts-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 70px;
+            background: var(--code-bg);
+            border: 1px solid var(--border-color-light);
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-color);
+            transition: background 0.2s var(--transition-timing),
+                        border-color var(--transition-speed) var(--transition-timing);
+            z-index: 100;
+        }
+
+        .shortcuts-toggle:hover,
+        .shortcuts-toggle:focus-visible {
+            background: var(--border-color-light);
+            outline: none;
+        }
+
+        .shortcuts-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .shortcuts-modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .shortcuts-modal-content {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 420px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .shortcuts-modal h3 {
+            margin: 0 0 16px 0;
+            color: var(--text-color);
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .shortcuts-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .shortcuts-table td {
+            padding: 6px 12px;
+            color: var(--text-color);
+        }
+
+        .shortcuts-table tr + tr td {
+            border-top: 1px solid var(--border-color-light);
+        }
+
+        .shortcuts-key {
+            display: inline-block;
+            background: var(--code-bg);
+            border: 1px solid var(--border-color-light);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-family: var(--code-font);
+            font-size: 13px;
+            min-width: 24px;
+            text-align: center;
+        }
+
         /* Theme-specific card styles */
         .theme-card[data-theme="light"] {
             background: #fff;
@@ -1299,13 +1383,8 @@
                 filterTree(query);
             });
 
-            // focus search on / key (when not in an input already)
+            // esc clears search and blurs
             document.addEventListener('keydown', function(e) {
-                if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
-                    e.preventDefault();
-                    input.focus();
-                }
-                // esc clears search and blurs
                 if (e.key === 'Escape' && document.activeElement === input) {
                     input.value = '';
                     filterTree('');
@@ -1832,7 +1911,7 @@
         <img src="/static/md.png" alt="mdlive" class="sidebar-logo">
     </div>
     <div class="sidebar-search">
-        <input type="text" id="sidebarSearch" placeholder="/" autocomplete="off" spellcheck="false">
+        <input type="text" id="sidebarSearch" placeholder="search (s)" autocomplete="off" spellcheck="false">
     </div>
     <div class="sidebar-content">
         <ul class="file-tree">
@@ -1879,6 +1958,12 @@
     </div>
 </div>
 
+<button class="shortcuts-toggle" onclick="openShortcutsModal()" title="Keyboard shortcuts (/)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+        <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M8 16h8"></path>
+    </svg>
+</button>
 <button class="theme-toggle" onclick="openThemeModal()">🎨</button>
 
 {% if editor_mode %}
@@ -2442,5 +2527,112 @@
         </div>
     </div>
 </div>
+
+<div class="shortcuts-modal" id="shortcutsModal">
+    <div class="shortcuts-modal-content">
+        <h3>Keyboard Shortcuts</h3>
+        <table class="shortcuts-table">
+            <tr><td><span class="shortcuts-key">/</span></td><td>Show shortcuts</td></tr>
+            {% if show_navigation and not editor_mode %}
+            <tr><td><span class="shortcuts-key">e</span></td><td>Edit file</td></tr>
+            {% endif %}
+            {% if show_navigation %}
+            <tr><td><span class="shortcuts-key">n</span></td><td>New file</td></tr>
+            {% endif %}
+            {% if current_file and not editor_mode %}
+            <tr><td><span class="shortcuts-key">d</span></td><td>Delete file</td></tr>
+            {% endif %}
+            {% if show_navigation %}
+            <tr><td><span class="shortcuts-key">k</span></td><td>Toggle sidebar</td></tr>
+            <tr><td><span class="shortcuts-key">s</span></td><td>Focus search</td></tr>
+            {% endif %}
+            {% if editor_mode %}
+            <tr><td><span class="shortcuts-key">h</span></td><td>Toggle history</td></tr>
+            <tr><td><span class="shortcuts-key">Esc</span></td><td>Cancel editing</td></tr>
+            {% else %}
+            <tr><td><span class="shortcuts-key">Esc</span></td><td>Close modal / blur input</td></tr>
+            {% endif %}
+        </table>
+    </div>
+</div>
+
+<script>
+function openShortcutsModal() {
+    document.getElementById('shortcutsModal').classList.add('show');
+}
+function closeShortcutsModal() {
+    document.getElementById('shortcutsModal').classList.remove('show');
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    var tag = document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+        if (e.key === 'Escape') document.activeElement.blur();
+        return;
+    }
+
+    var shortcutsModal = document.getElementById('shortcutsModal');
+    var themeModal = document.getElementById('themeModal');
+    var confirmDialog = document.getElementById('confirmDialog');
+    var fileDialog = document.getElementById('fileDialog');
+
+    // when shortcuts modal is open, only escape closes it
+    if (shortcutsModal && shortcutsModal.classList.contains('show')) {
+        if (e.key === 'Escape') closeShortcutsModal();
+        return;
+    }
+
+    // defer to existing escape handlers for other modals
+    if (themeModal && themeModal.classList.contains('show')) return;
+    if (confirmDialog && confirmDialog.classList.contains('show')) return;
+    if (fileDialog && fileDialog.classList.contains('show')) return;
+
+    switch (e.key) {
+        case '/':
+            e.preventDefault();
+            openShortcutsModal();
+            break;
+        case 'e':
+            if (currentFile && !{{ editor_mode|default(false)|tojson }}) {
+                window.location.href = '/edit/' + currentFile;
+            }
+            break;
+        case 'n':
+            if ({{ show_navigation|default(false)|tojson }}) {
+                window.location.href = '/new';
+            }
+            break;
+        case 'd':
+            if (currentFile && !{{ editor_mode|default(false)|tojson }}) {
+                deleteFile(currentFile);
+            }
+            break;
+        case 'k':
+            if ({{ show_navigation|default(false)|tojson }}) {
+                toggleSidebar();
+            }
+            break;
+        case 'h':
+            if ({{ editor_mode|default(false)|tojson }} && typeof toggleHistory === 'function') {
+                toggleHistory();
+            }
+            break;
+        case 's':
+            if ({{ show_navigation|default(false)|tojson }}) {
+                e.preventDefault();
+                var searchInput = document.getElementById('sidebarSearch');
+                if (searchInput) searchInput.focus();
+            }
+            break;
+    }
+});
+
+// close shortcuts modal on click outside
+document.getElementById('shortcutsModal').addEventListener('click', function(e) {
+    if (e.target === this) closeShortcutsModal();
+});
+</script>
 </body>
 </html>
