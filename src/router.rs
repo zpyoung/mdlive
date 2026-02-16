@@ -63,6 +63,15 @@ pub fn new_router(
             "/marked.min.js",
             get(handlers::static_files::serve_marked_js),
         )
+        .route("/static/md.png", get(handlers::static_files::serve_md_icon))
+        .route(
+            "/static/favicon.png",
+            get(handlers::static_files::serve_favicon),
+        )
+        .route(
+            "/static/mdlive.png",
+            get(handlers::static_files::serve_mdlive_logo),
+        )
         .route("/api/raw_content", get(handlers::api::api_raw_content))
         .route("/api/delete_file", post(handlers::api::api_delete_file))
         .route("/api/move_file", post(handlers::api::api_move_file))

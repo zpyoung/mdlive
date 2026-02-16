@@ -5,7 +5,9 @@ use axum::{
 use std::fs;
 
 use crate::state::SharedMarkdownState;
-use crate::template::{HIGHLIGHT_JS, MARKED_JS, MERMAID_JS, STATIC_JS_ETAG};
+use crate::template::{
+    FAVICON_PNG, HIGHLIGHT_JS, MARKED_JS, MDLIVE_LOGO_PNG, MD_ICON_PNG, MERMAID_JS, STATIC_ETAG,
+};
 use crate::util::guess_image_content_type;
 
 pub(crate) async fn serve_mermaid_js(headers: HeaderMap) -> impl IntoResponse {
@@ -21,14 +23,11 @@ pub(crate) async fn serve_marked_js(headers: HeaderMap) -> impl IntoResponse {
 }
 
 fn serve_embedded_js(headers: &HeaderMap, content: &'static str) -> Response {
-    let is_match = headers
-        .get(header::IF_NONE_MATCH)
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(|etags| etags.split(',').any(|tag| tag.trim() == STATIC_JS_ETAG));
+    let is_match = check_etag(headers);
 
     let response_headers = [
         (header::CONTENT_TYPE, "application/javascript"),
-        (header::ETAG, STATIC_JS_ETAG),
+        (header::ETAG, STATIC_ETAG),
         (header::CACHE_CONTROL, "public, no-cache"),
     ];
 
@@ -37,6 +36,41 @@ fn serve_embedded_js(headers: &HeaderMap, content: &'static str) -> Response {
     } else {
         (StatusCode::OK, response_headers, content).into_response()
     }
+}
+
+pub(crate) async fn serve_md_icon(headers: HeaderMap) -> impl IntoResponse {
+    serve_embedded_image(&headers, MD_ICON_PNG)
+}
+
+pub(crate) async fn serve_favicon(headers: HeaderMap) -> impl IntoResponse {
+    serve_embedded_image(&headers, FAVICON_PNG)
+}
+
+pub(crate) async fn serve_mdlive_logo(headers: HeaderMap) -> impl IntoResponse {
+    serve_embedded_image(&headers, MDLIVE_LOGO_PNG)
+}
+
+fn serve_embedded_image(headers: &HeaderMap, content: &'static [u8]) -> Response {
+    let is_match = check_etag(headers);
+
+    let response_headers = [
+        (header::CONTENT_TYPE, "image/png"),
+        (header::ETAG, STATIC_ETAG),
+        (header::CACHE_CONTROL, "public, no-cache"),
+    ];
+
+    if is_match {
+        (StatusCode::NOT_MODIFIED, response_headers).into_response()
+    } else {
+        (StatusCode::OK, response_headers, content).into_response()
+    }
+}
+
+fn check_etag(headers: &HeaderMap) -> bool {
+    headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|etags| etags.split(',').any(|tag| tag.trim() == STATIC_ETAG))
 }
 
 pub(crate) async fn serve_static_file_inner(
