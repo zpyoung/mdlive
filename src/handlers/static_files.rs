@@ -5,7 +5,9 @@ use axum::{
 use std::fs;
 
 use crate::state::SharedMarkdownState;
-use crate::template::{FAVICON_PNG, HIGHLIGHT_JS, MARKED_JS, MD_ICON_PNG, MDLIVE_LOGO_PNG, MERMAID_JS, STATIC_ETAG};
+use crate::template::{
+    FAVICON_PNG, HIGHLIGHT_JS, MARKED_JS, MDLIVE_LOGO_PNG, MD_ICON_PNG, MERMAID_JS, STATIC_ETAG,
+};
 use crate::util::guess_image_content_type;
 
 pub(crate) async fn serve_mermaid_js(headers: HeaderMap) -> impl IntoResponse {

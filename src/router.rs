@@ -63,10 +63,7 @@ pub fn new_router(
             "/marked.min.js",
             get(handlers::static_files::serve_marked_js),
         )
-        .route(
-            "/static/md.png",
-            get(handlers::static_files::serve_md_icon),
-        )
+        .route("/static/md.png", get(handlers::static_files::serve_md_icon))
         .route(
             "/static/favicon.png",
             get(handlers::static_files::serve_favicon),
