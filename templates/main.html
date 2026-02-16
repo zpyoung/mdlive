@@ -535,6 +535,23 @@
             opacity: 0.9;
         }
 
+        .confirm-dialog-message {
+            margin: 0 0 16px 0;
+            font-size: 14px;
+            color: var(--text-color);
+            line-height: 1.5;
+        }
+
+        .file-dialog-btn-destructive {
+            background: #e64553;
+            color: #fff;
+            border-color: #e64553;
+        }
+
+        .file-dialog-btn-destructive:hover {
+            opacity: 0.9;
+        }
+
         .theme-toggle {
             position: fixed;
             top: 20px;
@@ -879,6 +896,19 @@
             background: #a6e3a1;
             border-color: #a6e3a1;
             color: #1e1e2e;
+        }
+
+        .unsaved-dot {
+            display: none;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--link-color);
+            flex-shrink: 0;
+        }
+
+        .editor-header.unsaved .unsaved-dot {
+            display: block;
         }
 
         .editor-panes {
@@ -1467,26 +1497,26 @@
 
         function deleteFile(path) {
             hideContextMenu();
-            if (!confirm('Delete ' + path + '?')) return;
-
-            fetch('/api/delete_file', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: path })
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (!data.success) {
-                    alert('Delete failed: ' + (data.error || 'unknown error'));
-                    return;
-                }
-                if (path === currentFile) {
-                    window.location.href = '/';
-                }
-            })
-            .catch(function(err) {
-                alert('Delete failed: ' + err.message);
-            });
+            showConfirm('Delete ' + path + '?', function() {
+                fetch('/api/delete_file', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: path })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success) {
+                        alert('Delete failed: ' + (data.error || 'unknown error'));
+                        return;
+                    }
+                    if (path === currentFile) {
+                        window.location.href = '/';
+                    }
+                })
+                .catch(function(err) {
+                    alert('Delete failed: ' + err.message);
+                });
+            }, { destructive: true });
         }
 
         function moveFile(path) {
@@ -1549,6 +1579,26 @@
                 errorEl.textContent = msg;
                 errorEl.style.display = 'block';
             }
+        }
+
+        var _confirmDialogCallback = null;
+
+        function showConfirm(message, onConfirm, opts) {
+            opts = opts || {};
+            var overlay = document.getElementById('confirmDialog');
+            var okBtn = document.getElementById('confirmDialogOk');
+            document.getElementById('confirmDialogMessage').textContent = message;
+            _confirmDialogCallback = onConfirm;
+            okBtn.className = opts.destructive
+                ? 'file-dialog-btn-destructive'
+                : 'file-dialog-btn-confirm';
+            overlay.classList.add('show');
+        }
+
+        function closeConfirmDialog() {
+            var overlay = document.getElementById('confirmDialog');
+            if (overlay) overlay.classList.remove('show');
+            _confirmDialogCallback = null;
         }
 
         // Auto-refresh functionality using WebSocket
@@ -1632,10 +1682,29 @@
                 });
             }
 
+            // Confirm dialog events
+            var confirmOverlay = document.getElementById('confirmDialog');
+            var confirmOkBtn = document.getElementById('confirmDialogOk');
+            if (confirmOkBtn) {
+                confirmOkBtn.addEventListener('click', function() {
+                    var cb = _confirmDialogCallback;
+                    closeConfirmDialog();
+                    if (cb) cb();
+                });
+            }
+            document.getElementById('confirmDialogCancel').addEventListener('click', closeConfirmDialog);
+            if (confirmOverlay) {
+                confirmOverlay.addEventListener('click', function(e) {
+                    if (e.target === confirmOverlay) closeConfirmDialog();
+                });
+            }
+
             // Close modals with ESC key
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape') {
-                    if (fileDialogOverlay && fileDialogOverlay.classList.contains('show')) {
+                    if (confirmOverlay && confirmOverlay.classList.contains('show')) {
+                        closeConfirmDialog();
+                    } else if (fileDialogOverlay && fileDialogOverlay.classList.contains('show')) {
                         closeFileDialog();
                     } else if (modal.classList.contains('show')) {
                         closeThemeModal();
@@ -1694,6 +1763,16 @@
     </div>
 </div>
 
+<div id="confirmDialog" class="file-dialog-overlay">
+    <div class="file-dialog">
+        <p class="confirm-dialog-message" id="confirmDialogMessage"></p>
+        <div class="file-dialog-buttons">
+            <button class="file-dialog-btn-cancel" id="confirmDialogCancel">Cancel</button>
+            <button class="file-dialog-btn-confirm" id="confirmDialogOk">OK</button>
+        </div>
+    </div>
+</div>
+
 {% if not editor_mode and current_file %}
 <a class="edit-toggle" href="/edit/{{ current_file|safe }}" title="Edit">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1708,6 +1787,7 @@
 <div class="editor-container">
     <div class="editor-notify" id="editorNotify">File changed externally -- reload to see changes</div>
     <div class="editor-header">
+        <span class="unsaved-dot" id="unsavedDot"></span>
         {% if new_file_mode %}
         <input type="text" class="editor-filename-input" id="editorFilename" value="{{ current_file }}" spellcheck="false" autocomplete="off">
         {% else %}
@@ -1750,6 +1830,37 @@
     var filePath = {{ current_file|tojson }};
     var debounceTimer = null;
     var hasUnsavedChanges = false;
+    var editorHeader = document.querySelector('.editor-header');
+    var originalTitle = document.title;
+
+    function updateUnsavedIndicator() {
+        if (hasUnsavedChanges) {
+            editorHeader.classList.add('unsaved');
+            document.title = '\u25CF ' + originalTitle;
+        } else {
+            editorHeader.classList.remove('unsaved');
+            document.title = originalTitle;
+        }
+    }
+
+    window.addEventListener('beforeunload', function(e) {
+        if (hasUnsavedChanges) {
+            e.preventDefault();
+        }
+    });
+
+    document.querySelectorAll('.file-tree a').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            if (hasUnsavedChanges) {
+                e.preventDefault();
+                var href = link.getAttribute('href');
+                showConfirm('You have unsaved changes. Leave this page?', function() {
+                    hasUnsavedChanges = false;
+                    window.location.href = href;
+                });
+            }
+        });
+    });
 
     // configure marked
     if (typeof marked !== 'undefined') {
@@ -1776,7 +1887,10 @@
 
     // live preview with debounce
     textarea.addEventListener('input', function() {
-        hasUnsavedChanges = true;
+        if (!hasUnsavedChanges) {
+            hasUnsavedChanges = true;
+            updateUnsavedIndicator();
+        }
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(updatePreview, 300);
     });
@@ -1800,6 +1914,7 @@
             this.value = this.value.substring(0, start) + '  ' + this.value.substring(end);
             this.selectionStart = this.selectionEnd = start + 2;
             hasUnsavedChanges = true;
+            updateUnsavedIndicator();
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(updatePreview, 300);
             return;
@@ -1820,9 +1935,13 @@
         }
     });
 
-    // esc = cancel (only when not in filename input)
+    // esc = cancel (only when not in filename input, and no dialog open)
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && document.activeElement !== document.getElementById('editorFilename')) {
+            var cd = document.getElementById('confirmDialog');
+            if (cd && cd.classList.contains('show')) return;
+            var fd = document.getElementById('fileDialog');
+            if (fd && fd.classList.contains('show')) return;
             // close history panel if open
             var historyPanel = document.getElementById('historyPanel');
             if (historyPanel && historyPanel.classList.contains('show')) {
@@ -1857,6 +1976,7 @@
         }
         textarea.focus();
         hasUnsavedChanges = true;
+        updateUnsavedIndicator();
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(updatePreview, 300);
     }
@@ -1892,6 +2012,7 @@
                 return;
             }
             hasUnsavedChanges = false;
+            updateUnsavedIndicator();
             saveBtn.textContent = 'Saved';
             saveBtn.classList.add('saved');
             setTimeout(function() {
@@ -1914,7 +2035,13 @@
 
     // cancel
     window.editorCancel = function() {
-        if (hasUnsavedChanges && !confirm('Discard unsaved changes?')) return;
+        if (hasUnsavedChanges) {
+            showConfirm('Discard unsaved changes?', function() {
+                hasUnsavedChanges = false;
+                editorCancel();
+            });
+            return;
+        }
         if (isNewFile || !filePath) {
             window.location.href = '/';
         } else {
@@ -1988,7 +2115,13 @@
     }
 
     function restoreVersion(timestamp) {
-        if (hasUnsavedChanges && !confirm('Discard unsaved changes and restore this version?')) return;
+        if (hasUnsavedChanges) {
+            showConfirm('Discard unsaved changes and restore this version?', function() {
+                hasUnsavedChanges = false;
+                restoreVersion(timestamp);
+            });
+            return;
+        }
 
         fetch('/api/restore_version', {
             method: 'POST',
@@ -2001,6 +2134,7 @@
                 textarea.value = data.content;
                 updatePreview();
                 hasUnsavedChanges = true;
+                updateUnsavedIndicator();
                 var panel = document.getElementById('historyPanel');
                 if (panel) panel.classList.remove('show');
             }
