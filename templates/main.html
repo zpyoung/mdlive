@@ -773,6 +773,256 @@
         a { color: var(--link-color); text-decoration: none; }
         a:hover { text-decoration: underline; }
         img { max-width: 100%; height: auto; }
+
+        /* Editor mode styles */
+        .editor-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .editor-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 16px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--code-bg);
+            flex-shrink: 0;
+            min-height: 48px;
+        }
+
+        .editor-filename {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            color: var(--text-color);
+            opacity: 0.8;
+            flex-shrink: 0;
+        }
+
+        .editor-filename-input {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            color: var(--text-color);
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 4px 8px;
+            min-width: 250px;
+            outline: none;
+        }
+
+        .editor-filename-input:focus {
+            border-color: var(--link-color);
+        }
+
+        .editor-spacer {
+            flex: 1;
+        }
+
+        .editor-btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            font-size: 13px;
+            font-family: inherit;
+            background: transparent;
+            color: var(--text-color);
+            transition: background 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .editor-btn:hover {
+            background: var(--border-color-light);
+        }
+
+        .editor-btn-save {
+            background: var(--link-color);
+            color: #fff;
+            border-color: var(--link-color);
+        }
+
+        .editor-btn-save:hover {
+            opacity: 0.9;
+            background: var(--link-color);
+        }
+
+        .editor-btn-save.saved {
+            background: #a6e3a1;
+            border-color: #a6e3a1;
+            color: #1e1e2e;
+        }
+
+        .editor-panes {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .editor-pane {
+            flex: 1;
+            overflow: auto;
+            min-width: 0;
+        }
+
+        .editor-pane + .editor-pane {
+            border-left: 1px solid var(--border-color);
+        }
+
+        .editor-pane textarea {
+            width: 100%;
+            height: 100%;
+            resize: none;
+            border: none;
+            outline: none;
+            padding: 20px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-color);
+            background: var(--bg-color);
+            tab-size: 2;
+        }
+
+        .editor-preview {
+            padding: 20px;
+            max-width: var(--content-max-width);
+        }
+
+        .editor-notify {
+            display: none;
+            padding: 8px 16px;
+            background: var(--link-color);
+            color: #fff;
+            font-size: 13px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .editor-notify.show {
+            display: block;
+        }
+
+        /* history panel */
+        .history-panel {
+            display: none;
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 320px;
+            height: 100%;
+            background: var(--bg-color);
+            border-left: 1px solid var(--border-color);
+            z-index: 200;
+            flex-direction: column;
+            box-shadow: -4px 0 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .history-panel.show {
+            display: flex;
+        }
+
+        .history-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .history-panel-close {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 4px;
+        }
+
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .history-item {
+            display: block;
+            width: 100%;
+            padding: 10px 12px;
+            background: none;
+            border: none;
+            border-radius: 6px;
+            color: var(--text-color);
+            text-align: left;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            margin-bottom: 2px;
+        }
+
+        .history-item:hover {
+            background: var(--border-color-light);
+        }
+
+        .history-item-time {
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--link-color);
+        }
+
+        .history-item-preview {
+            margin-top: 2px;
+            opacity: 0.7;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* sidebar edit icon */
+        .file-tree li .file-link-wrapper {
+            display: flex;
+            align-items: center;
+        }
+
+        .file-tree li .file-link-wrapper a {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-tree li .edit-icon {
+            display: none;
+            padding: 4px 6px;
+            color: var(--blockquote-color);
+            cursor: pointer;
+            font-size: 13px;
+            border-radius: 4px;
+            flex-shrink: 0;
+            text-decoration: none;
+        }
+
+        .file-tree li .edit-icon:hover {
+            background: var(--border-color-light);
+            color: var(--text-color);
+        }
+
+        .file-tree li:hover .edit-icon {
+            display: block;
+        }
+
+        {% if show_navigation and editor_mode %}
+        .editor-container {
+            margin-left: var(--sidebar-width);
+            transition: margin-left var(--transition-speed) var(--transition-timing);
+        }
+
+        body.sidebar-collapsed .editor-container {
+            margin-left: var(--sidebar-collapsed-width);
+        }
+        {% endif %}
     </style>
 
     <script src="/highlight.min.js"></script>
@@ -1108,7 +1358,7 @@
             var menu = document.getElementById('contextMenu');
             if (!menu) return;
 
-            document.querySelectorAll('.file-tree a').forEach(function(link) {
+            document.querySelectorAll('.file-tree a:not(.edit-icon)').forEach(function(link) {
                 link.addEventListener('contextmenu', function(e) {
                     e.preventDefault();
                     var path = link.getAttribute('href').replace(/^\//, '');
@@ -1144,12 +1394,15 @@
             menu.innerHTML = '';
 
             if (type === 'file') {
+                var editBtn = createMenuItem('Edit', false);
+                editBtn.onclick = function() { hideContextMenu(); window.location.href = '/edit/' + path; };
                 var copyBtn = createMenuItem('Copy raw markdown', false);
                 copyBtn.onclick = function() { copyRawMarkdown(path); };
                 var moveBtn = createMenuItem('Move / rename', false);
                 moveBtn.onclick = function() { moveFile(path); };
                 var deleteBtn = createMenuItem('Delete file', true);
                 deleteBtn.onclick = function() { deleteFile(path); };
+                menu.appendChild(editBtn);
                 menu.appendChild(copyBtn);
                 menu.appendChild(moveBtn);
                 menu.appendChild(deleteBtn);
@@ -1238,26 +1491,7 @@
 
         function addNewFile(dirPath) {
             hideContextMenu();
-            var defaultPath = dirPath ? dirPath + '/new.md' : 'new.md';
-            openFileDialog('New file', defaultPath, 'Path relative to root (.md or .markdown)', function(newPath) {
-                fetch('/api/create_file', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path: newPath })
-                })
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (!data.success) {
-                        showFileDialogError(data.error || 'unknown error');
-                        return;
-                    }
-                    closeFileDialog();
-                    window.location.href = '/' + data.path;
-                })
-                .catch(function(err) {
-                    showFileDialogError(err.message);
-                });
-            });
+            window.location.href = '/new?dir=' + encodeURIComponent(dirPath || '');
         }
 
         var _fileDialogCallback = null;
@@ -1336,7 +1570,11 @@
             initCopyButtons();
             initMermaid();
             initContextMenu();
-            setupLiveReload();
+            if (typeof window._editorSetupLiveReload === 'function') {
+                window._editorSetupLiveReload();
+            } else {
+                setupLiveReload();
+            }
 
             // Modal close functionality
             const modal = document.getElementById('themeModal');
@@ -1406,9 +1644,12 @@
                     <ul>{{ loop(item.children) }}</ul>
                 </details>
                 {% else %}
-                <a href="/{{ item.path|safe }}"{% if item.path == current_file %} class="active"{% endif %}>
-                    {{ item.name }}
-                </a>
+                <div class="file-link-wrapper">
+                    <a href="/{{ item.path|safe }}"{% if item.path == current_file %} class="active"{% endif %}>
+                        {{ item.name }}
+                    </a>
+                    <a href="/edit/{{ item.path|safe }}" class="edit-icon" title="Edit" onclick="event.stopPropagation()">&#9998;</a>
+                </div>
                 {% endif %}
             </li>
             {% endfor %}
@@ -1432,9 +1673,323 @@
 {% endif %}
 
 <button class="theme-toggle" onclick="openThemeModal()">🎨</button>
+
+{% if editor_mode %}
+<div class="editor-container">
+    <div class="editor-notify" id="editorNotify">File changed externally -- reload to see changes</div>
+    <div class="editor-header">
+        {% if new_file_mode %}
+        <input type="text" class="editor-filename-input" id="editorFilename" value="{{ current_file }}" spellcheck="false" autocomplete="off">
+        {% else %}
+        <span class="editor-filename">{{ current_file }}</span>
+        {% endif %}
+        <div class="editor-spacer"></div>
+        {% if has_history %}
+        <button class="editor-btn" id="editorHistoryBtn" onclick="toggleHistory()">History</button>
+        {% endif %}
+        <button class="editor-btn" onclick="editorCancel()">Cancel</button>
+        <button class="editor-btn editor-btn-save" id="editorSaveBtn" onclick="editorSave()">Save</button>
+    </div>
+    <div class="editor-panes">
+        <div class="editor-pane">
+            <textarea id="editorTextarea" spellcheck="false">{{ raw_content }}</textarea>
+        </div>
+        <div class="editor-pane">
+            <div id="editorPreview" class="editor-preview markdown-body"></div>
+        </div>
+    </div>
+</div>
+
+{% if has_history %}
+<div class="history-panel" id="historyPanel">
+    <div class="history-panel-header">
+        <span>Version History</span>
+        <button class="history-panel-close" onclick="toggleHistory()">x</button>
+    </div>
+    <div class="history-list" id="historyList"></div>
+</div>
+{% endif %}
+
+<script src="/marked.min.js"></script>
+<script>
+(function() {
+    var textarea = document.getElementById('editorTextarea');
+    var preview = document.getElementById('editorPreview');
+    var saveBtn = document.getElementById('editorSaveBtn');
+    var isNewFile = {{ new_file_mode|default(false)|lower }};
+    var filePath = "{{ current_file }}";
+    var debounceTimer = null;
+    var hasUnsavedChanges = false;
+
+    // configure marked
+    if (typeof marked !== 'undefined') {
+        marked.setOptions({
+            gfm: true,
+            breaks: false,
+            headerIds: true
+        });
+    }
+
+    function updatePreview() {
+        if (typeof marked !== 'undefined') {
+            preview.innerHTML = marked.parse(textarea.value);
+            if (typeof hljs !== 'undefined') {
+                preview.querySelectorAll('pre code').forEach(function(block) {
+                    hljs.highlightElement(block);
+                });
+            }
+        }
+    }
+
+    // initial render
+    updatePreview();
+
+    // live preview with debounce
+    textarea.addEventListener('input', function() {
+        hasUnsavedChanges = true;
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(updatePreview, 300);
+    });
+
+    // keyboard shortcuts
+    textarea.addEventListener('keydown', function(e) {
+        var isMod = e.ctrlKey || e.metaKey;
+
+        // ctrl/cmd+s = save
+        if (isMod && e.key === 's') {
+            e.preventDefault();
+            editorSave();
+            return;
+        }
+
+        // tab = insert 2 spaces
+        if (e.key === 'Tab' && !e.shiftKey) {
+            e.preventDefault();
+            var start = this.selectionStart;
+            var end = this.selectionEnd;
+            this.value = this.value.substring(0, start) + '  ' + this.value.substring(end);
+            this.selectionStart = this.selectionEnd = start + 2;
+            hasUnsavedChanges = true;
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(updatePreview, 300);
+            return;
+        }
+
+        // ctrl/cmd+b = bold
+        if (isMod && e.key === 'b') {
+            e.preventDefault();
+            wrapSelection('**');
+            return;
+        }
+
+        // ctrl/cmd+i = italic
+        if (isMod && e.key === 'i') {
+            e.preventDefault();
+            wrapSelection('*');
+            return;
+        }
+    });
+
+    // esc = cancel (only when not in filename input)
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.activeElement !== document.getElementById('editorFilename')) {
+            // close history panel if open
+            var historyPanel = document.getElementById('historyPanel');
+            if (historyPanel && historyPanel.classList.contains('show')) {
+                historyPanel.classList.remove('show');
+                return;
+            }
+            editorCancel();
+        }
+    });
+
+    // ctrl/cmd+s anywhere on page
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            editorSave();
+        }
+    });
+
+    function wrapSelection(marker) {
+        var start = textarea.selectionStart;
+        var end = textarea.selectionEnd;
+        var text = textarea.value;
+        var selected = text.substring(start, end);
+        var replacement = marker + (selected || 'text') + marker;
+        textarea.value = text.substring(0, start) + replacement + text.substring(end);
+        if (selected) {
+            textarea.selectionStart = start + marker.length;
+            textarea.selectionEnd = end + marker.length;
+        } else {
+            textarea.selectionStart = start + marker.length;
+            textarea.selectionEnd = start + marker.length + 4;
+        }
+        textarea.focus();
+        hasUnsavedChanges = true;
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(updatePreview, 300);
+    }
+
+    // save
+    window.editorSave = function() {
+        var content = textarea.value;
+        var path = isNewFile
+            ? document.getElementById('editorFilename').value.trim()
+            : filePath;
+
+        if (!path) return;
+
+        var endpoint = isNewFile ? '/api/create_file' : '/api/save_file';
+        var body = isNewFile
+            ? { path: path, content: content }
+            : { path: path, content: content };
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+
+        fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.success) {
+                alert('Save failed: ' + (data.error || 'unknown error'));
+                saveBtn.textContent = 'Save';
+                saveBtn.disabled = false;
+                return;
+            }
+            hasUnsavedChanges = false;
+            saveBtn.textContent = 'Saved';
+            saveBtn.classList.add('saved');
+            setTimeout(function() {
+                saveBtn.textContent = 'Save';
+                saveBtn.classList.remove('saved');
+                saveBtn.disabled = false;
+            }, 1500);
+
+            // if new file, redirect to edit existing
+            if (isNewFile) {
+                window.location.href = '/edit/' + path;
+            }
+        })
+        .catch(function(err) {
+            alert('Save failed: ' + err.message);
+            saveBtn.textContent = 'Save';
+            saveBtn.disabled = false;
+        });
+    };
+
+    // cancel
+    window.editorCancel = function() {
+        if (hasUnsavedChanges && !confirm('Discard unsaved changes?')) return;
+        if (isNewFile) {
+            window.location.href = '/';
+        } else {
+            window.location.href = '/' + filePath;
+        }
+    };
+
+    // websocket: suppress reload in editor mode
+    window._editorSetupLiveReload = function() {
+        var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        var wsUrl = protocol + '//' + window.location.host + '/ws';
+        var socket = new WebSocket(wsUrl);
+        var notify = document.getElementById('editorNotify');
+
+        socket.onmessage = function(event) {
+            try {
+                var message = JSON.parse(event.data);
+                if (message.type === 'Reload') {
+                    notify.classList.add('show');
+                    setTimeout(function() {
+                        notify.classList.remove('show');
+                    }, 3000);
+                }
+            } catch(e) {}
+        };
+
+        socket.onclose = function() {
+            setTimeout(window._editorSetupLiveReload, 3000);
+        };
+    };
+
+    // history
+    window.toggleHistory = function() {
+        var panel = document.getElementById('historyPanel');
+        if (!panel) return;
+        if (panel.classList.contains('show')) {
+            panel.classList.remove('show');
+            return;
+        }
+        panel.classList.add('show');
+        loadHistory();
+    };
+
+    function loadHistory() {
+        var list = document.getElementById('historyList');
+        if (!list) return;
+        list.innerHTML = '<div style="padding:16px;opacity:0.6">Loading...</div>';
+
+        fetch('/api/file_history?path=' + encodeURIComponent(filePath))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.entries || data.entries.length === 0) {
+                    list.innerHTML = '<div style="padding:16px;opacity:0.6">No history yet</div>';
+                    return;
+                }
+                list.innerHTML = '';
+                data.entries.forEach(function(entry) {
+                    var btn = document.createElement('button');
+                    btn.className = 'history-item';
+                    var d = new Date(parseInt(entry.timestamp) * 1000);
+                    var timeStr = d.toLocaleString();
+                    btn.innerHTML = '<div class="history-item-time">' + timeStr + '</div>' +
+                        '<div class="history-item-preview">' + escapeHtml(entry.preview) + '</div>';
+                    btn.onclick = function() { restoreVersion(entry.timestamp); };
+                    list.appendChild(btn);
+                });
+            })
+            .catch(function() {
+                list.innerHTML = '<div style="padding:16px;opacity:0.6">Failed to load history</div>';
+            });
+    }
+
+    function restoreVersion(timestamp) {
+        if (hasUnsavedChanges && !confirm('Discard unsaved changes and restore this version?')) return;
+
+        fetch('/api/restore_version', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: filePath, timestamp: timestamp })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.content !== undefined) {
+                textarea.value = data.content;
+                updatePreview();
+                hasUnsavedChanges = true;
+                var panel = document.getElementById('historyPanel');
+                if (panel) panel.classList.remove('show');
+            }
+        })
+        .catch(function(err) { alert('Restore failed: ' + err.message); });
+    }
+
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+})();
+</script>
+{% else %}
 <div id="content">
 {{ content }}
 </div>
+{% endif %}
 
 <div class="theme-modal" id="themeModal">
     <div class="theme-modal-content">

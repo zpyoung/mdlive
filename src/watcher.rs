@@ -4,7 +4,14 @@ use std::path::Path;
 use crate::state::{ServerMessage, SharedMarkdownState};
 use crate::util::{is_image_file, is_markdown_file};
 
+fn is_mdlive_path(path: &Path) -> bool {
+    path.components().any(|c| c.as_os_str() == ".mdlive")
+}
+
 pub(crate) async fn handle_file_event(event: Event, state: &SharedMarkdownState) {
+    if event.paths.iter().any(|p| is_mdlive_path(p)) {
+        return;
+    }
     match event.kind {
         notify::EventKind::Modify(notify::event::ModifyKind::Name(rename_mode)) => {
             use notify::event::RenameMode;

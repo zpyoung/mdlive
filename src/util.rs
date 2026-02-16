@@ -14,6 +14,9 @@ fn scan_recursive(dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
+            if path.file_name().is_some_and(|n| n == ".mdlive") {
+                continue;
+            }
             scan_recursive(&path, files)?;
         } else if path.is_file() && is_markdown_file(&path) {
             files.push(path);
