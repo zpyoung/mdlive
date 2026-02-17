@@ -8,6 +8,8 @@ I built this to sit next to AI coding agents. When an agent writes markdown -- p
 
 This started as a fork of Jose Fernandez's [mdserve](https://github.com/jfernandez/mdserve). The original idea and core implementation are his. I've since taken it in a different direction: in-browser editing, file CRUD, version history, keyboard shortcuts, theming. Different enough to warrant its own repo.
 
+<video src="docs/images/mdlive.mp4" controls muted width="100%"></video>
+
 ## Install
 
 From crates.io:
@@ -52,6 +54,8 @@ This is particularly useful for reviewing agent-generated plans, design docs, an
 
 GFM rendering with tables, task lists, strikethrough, and fenced code blocks. Syntax highlighting via highlight.js. Mermaid diagram rendering. YAML and TOML frontmatter is stripped before rendering. Images referenced in markdown are served inline (png, jpg, gif, svg, webp).
 
+![Single file view](docs/images/single-view.png)
+
 ### Themes
 
 Five built-in themes: Catppuccin Mocha (default), Catppuccin Macchiato, Catppuccin Latte, Light, and Dark. Switch via the palette icon in the bottom-right corner. Selection is persisted to localStorage.
@@ -64,17 +68,25 @@ Every markdown file has a built-in editor accessible via the edit icon or the `e
 
 Full CRUD from the browser. Create new files, rename/move existing ones, delete with confirmation. All operations available from both the right-click context menu (on sidebar items) and from buttons in the editor header. In single-file mode, right-click the content area for the context menu.
 
+![Context menu](docs/images/context-menu.png)
+
 ### Revisions
 
 Every save creates a timestamped snapshot in a `.mdlive/` directory next to your files. Open the revisions panel (`h` or `r` shortcut, or the Revisions button) to browse previous versions and restore any of them. You'll probably want to add `.mdlive` to your `.gitignore` unless you want revision history in your repo -- which can actually be handy for shared design docs or architecture decisions.
+
+![Revision history](docs/images/revision-sidebar.jpg) ![Revision detail with diff](docs/images/revision-detail.png)
 
 ### Directory mode
 
 Pass a directory and mdlive recursively finds all `.md` and `.markdown` files, builds a collapsible tree sidebar. Right-click folders to create files in specific subdirectories. The sidebar is resizable (drag the edge) and collapsible (`k` shortcut or the toggle button). Search the tree by pressing `s`.
 
+![Directory mode with sidebar](docs/images/dir-view.png)
+
 ### Keyboard shortcuts
 
 Press `/` to see all available shortcuts. Shortcuts are suppressed when typing in inputs, when modifier keys are held, and when dialogs are open.
+
+![Keyboard shortcuts](docs/images/shortcuts.png)
 
 | Key | Action |
 |-----|--------|
