@@ -1,6 +1,6 @@
 use anyhow::Result;
 use axum::{
-    routing::{get, post},
+    routing::{delete, get, post},
     Router,
 };
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
@@ -81,6 +81,10 @@ pub fn new_router(
         .route(
             "/api/restore_version",
             post(handlers::api::api_restore_version),
+        )
+        .route(
+            "/api/delete_history_entry",
+            delete(handlers::api::api_delete_history_entry),
         )
         .route("/edit/*filepath", get(handlers::pages::serve_editor))
         .route("/*filepath", get(handlers::pages::serve_file))

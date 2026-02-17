@@ -1081,6 +1081,106 @@
             display: inline-block;
         }
 
+        .revision-controls {
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .revision-controls.show {
+            display: inline-flex;
+        }
+
+        .revision-overlay {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 50;
+            background: var(--bg-color);
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .revision-overlay.show {
+            display: flex;
+        }
+
+
+        .revision-overlay-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 32px;
+        }
+
+        .revision-diff-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--link-color);
+            background: none;
+            border: none;
+            padding: 0;
+            font-family: inherit;
+        }
+
+        .revision-diff-toggle:hover {
+            text-decoration: underline;
+        }
+
+        .revision-diff-toggle svg {
+            transition: transform 0.15s;
+        }
+
+        .revision-diff-toggle.expanded svg {
+            transform: rotate(90deg);
+        }
+
+        .revision-diff {
+            display: none;
+            margin-top: 12px;
+            border: 1px solid var(--border-color-light);
+            border-radius: 6px;
+            overflow: hidden;
+            font-family: 'SF Mono', 'Fira Code', 'Fira Mono', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .revision-diff.show {
+            display: block;
+        }
+
+        .revision-diff pre {
+            margin: 0;
+            padding: 12px 16px;
+            overflow-x: auto;
+            background: var(--bg-color);
+        }
+
+        .diff-add {
+            background: rgba(40, 167, 69, 0.15);
+            color: inherit;
+        }
+
+        .diff-del {
+            background: rgba(220, 53, 69, 0.15);
+            color: inherit;
+        }
+
+        .diff-hunk {
+            color: var(--link-color);
+            opacity: 0.7;
+        }
+
+        .diff-context {
+            opacity: 0.6;
+        }
+
         .editor-panes {
             display: flex;
             flex: 1;
@@ -1194,7 +1294,8 @@
         }
 
         .history-item {
-            display: block;
+            display: flex;
+            align-items: flex-start;
             width: 100%;
             padding: 10px 12px;
             background: none;
@@ -1212,6 +1313,11 @@
             background: var(--border-color-light);
         }
 
+        .history-item-content {
+            flex: 1;
+            min-width: 0;
+        }
+
         .history-item-time {
             font-weight: 600;
             font-size: 12px;
@@ -1224,6 +1330,30 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+
+        .history-item-delete {
+            flex-shrink: 0;
+            background: none;
+            border: none;
+            color: var(--text-color);
+            opacity: 0;
+            cursor: pointer;
+            padding: 2px 4px;
+            margin-left: 4px;
+            border-radius: 4px;
+            font-size: 14px;
+            line-height: 1;
+            transition: opacity 0.15s, color 0.15s;
+        }
+
+        .history-item:hover .history-item-delete {
+            opacity: 0.5;
+        }
+
+        .history-item-delete:hover {
+            opacity: 1 !important;
+            color: #e55;
         }
 
         {% if show_navigation and editor_mode %}
@@ -2006,6 +2136,15 @@
         </button>
         {% endif %}
         <span class="revision-badge" id="revisionBadge"></span>
+        <span class="revision-controls" id="revisionControls">
+            <span class="header-separator"></span>
+            <button class="revision-diff-toggle" id="revisionDiffToggle" onclick="toggleRevisionDiff()">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                Show changes
+            </button>
+            <button class="editor-btn" onclick="revertToRevision()">Revert to this version</button>
+            <button class="editor-btn" onclick="dismissRevisionOverlay()">Back to editing</button>
+        </span>
         <div class="editor-spacer"></div>
         <button class="editor-btn" onclick="editorCancel()">Close</button>
         <button class="editor-btn editor-btn-save" id="editorSaveBtn" onclick="editorSave()">Save</button>
@@ -2018,13 +2157,17 @@
         {% endif %}
         <img src="/static/mdlive.png" alt="mdlive" class="branding-logo">
     </div>
-    <div class="editor-panes">
+    <div class="editor-panes" style="position:relative;">
         <div class="editor-pane">
             <textarea id="editorTextarea" spellcheck="false">{{ raw_content }}</textarea>
         </div>
         <div class="editor-pane-resize-handle" id="editorResizeHandle"></div>
         <div class="editor-pane">
             <div id="editorPreview" class="editor-preview markdown-body"></div>
+        </div>
+        <div class="revision-overlay" id="revisionOverlay">
+            <div class="revision-diff" id="revisionDiff"></div>
+            <div class="revision-overlay-content markdown-body" id="revisionOverlayContent"></div>
         </div>
     </div>
 </div>
@@ -2062,32 +2205,10 @@
         }
     }
 
-    // check for ?restore=TIMESTAMP from view-mode history
-    var restoreParam = new URLSearchParams(window.location.search).get('restore');
-    if (restoreParam && filePath) {
-        fetch('/api/restore_version', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ path: filePath, timestamp: restoreParam })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.content !== undefined) {
-                textarea.value = data.content;
-                updatePreview();
-                hasUnsavedChanges = true;
-                updateUnsavedIndicator();
-                var d = new Date(parseInt(restoreParam) * 1000);
-                var badge = document.getElementById('revisionBadge');
-                if (badge) {
-                    badge.textContent = 'Viewing revision: ' + d.toLocaleString();
-                    badge.classList.add('show');
-                }
-            }
-        });
-        // clean up URL without reload
-        history.replaceState(null, '', window.location.pathname);
-    }
+    // revision overlay state
+    var _activeRevisionContent = null;
+    var _activeRevisionTimestamp = null;
+    var _revisionRequestCounter = 0;
 
     window.addEventListener('beforeunload', function(e) {
         if (hasUnsavedChanges) {
@@ -2195,6 +2316,13 @@
         if (fd && fd.classList.contains('show')) return;
         var tm = document.getElementById('themeModal');
         if (tm && tm.classList.contains('show')) return;
+
+        // close revision overlay if open
+        var revOverlay = document.getElementById('revisionOverlay');
+        if (revOverlay && revOverlay.classList.contains('show')) {
+            dismissRevisionOverlay();
+            return;
+        }
 
         // close history panel if open
         var historyPanel = document.getElementById('historyPanel');
@@ -2422,13 +2550,29 @@
                 }
                 list.innerHTML = '';
                 data.entries.forEach(function(entry) {
-                    var btn = document.createElement('button');
+                    var btn = document.createElement('div');
                     btn.className = 'history-item';
                     var d = new Date(parseInt(entry.timestamp) * 1000);
                     var timeStr = d.toLocaleString();
-                    btn.innerHTML = '<div class="history-item-time">' + timeStr + '</div>' +
+
+                    var content = document.createElement('div');
+                    content.className = 'history-item-content';
+                    content.innerHTML = '<div class="history-item-time">v' + entry.version + ' &middot; ' + timeStr + '</div>' +
                         '<div class="history-item-preview">' + escapeHtml(entry.preview) + '</div>';
-                    btn.onclick = function() { restoreVersion(entry.timestamp); };
+                    content.style.cursor = 'pointer';
+                    content.onclick = function() { restoreVersion(entry.timestamp, entry.version); };
+
+                    var del = document.createElement('button');
+                    del.className = 'history-item-delete';
+                    del.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
+                    del.title = 'Delete revision';
+                    del.onclick = function(e) {
+                        e.stopPropagation();
+                        deleteHistoryEntry(entry.timestamp);
+                    };
+
+                    btn.appendChild(content);
+                    btn.appendChild(del);
                     list.appendChild(btn);
                 });
             })
@@ -2437,15 +2581,30 @@
             });
     }
 
-    function restoreVersion(timestamp) {
-        if (hasUnsavedChanges) {
-            showConfirm('Discard unsaved changes and restore this version?', function() {
-                hasUnsavedChanges = false;
-                restoreVersion(timestamp);
-            });
-            return;
-        }
+    function deleteHistoryEntry(timestamp) {
+        showConfirm('Delete this revision? This cannot be undone.', function() {
+            fetch('/api/delete_history_entry', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: filePath, timestamp: timestamp })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    if (_activeRevisionTimestamp === timestamp) {
+                        dismissRevisionOverlay();
+                    }
+                    loadHistory();
+                } else {
+                    alert('Failed to delete: ' + (data.error || 'unknown error'));
+                }
+            })
+            .catch(function(err) { alert('Delete failed: ' + err.message); });
+        }, { destructive: true });
+    }
 
+    function restoreVersion(timestamp, version) {
+        var requestId = ++_revisionRequestCounter;
         fetch('/api/restore_version', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2453,26 +2612,212 @@
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
+            if (requestId !== _revisionRequestCounter) return;
             if (data.content !== undefined) {
-                textarea.value = data.content;
-                updatePreview();
-                hasUnsavedChanges = true;
-                updateUnsavedIndicator();
+                _activeRevisionContent = data.content;
+                _activeRevisionTimestamp = timestamp;
                 var d = new Date(parseInt(timestamp) * 1000);
+
+                var overlay = document.getElementById('revisionOverlay');
+                var overlayContent = document.getElementById('revisionOverlayContent');
+                var diffSection = document.getElementById('revisionDiff');
+                var diffToggle = document.getElementById('revisionDiffToggle');
+                var controls = document.getElementById('revisionControls');
+
+                if (typeof marked !== 'undefined') {
+                    overlayContent.innerHTML = marked.parse(data.content);
+                    if (typeof hljs !== 'undefined') {
+                        overlayContent.querySelectorAll('pre code').forEach(function(block) {
+                            hljs.highlightElement(block);
+                        });
+                    }
+                    if (typeof mermaid !== 'undefined') {
+                        overlayContent.querySelectorAll('.language-mermaid').forEach(function(block) {
+                            var pre = block.closest('pre');
+                            if (!pre) return;
+                            var div = document.createElement('div');
+                            div.className = 'mermaid';
+                            div.textContent = block.textContent;
+                            pre.parentNode.replaceChild(div, pre);
+                        });
+                        mermaid.run();
+                    }
+                } else {
+                    overlayContent.textContent = data.content;
+                }
+
+                diffSection.classList.remove('show');
+                diffSection.innerHTML = '';
+                diffToggle.classList.remove('expanded');
+
+                overlay.classList.add('show');
+                controls.classList.add('show');
                 var badge = document.getElementById('revisionBadge');
-                badge.textContent = 'Viewing revision: ' + d.toLocaleString();
-                badge.classList.add('show');
-                var panel = document.getElementById('historyPanel');
-                if (panel) panel.classList.remove('show');
+                if (badge) {
+                    badge.textContent = 'v' + version + ' \u00b7 ' + d.toLocaleString();
+                    badge.classList.add('show');
+                }
             }
         })
-        .catch(function(err) { alert('Restore failed: ' + err.message); });
+        .catch(function(err) { alert('Failed to load revision: ' + err.message); });
     }
+
+    window.dismissRevisionOverlay = function() {
+        document.getElementById('revisionOverlay').classList.remove('show');
+        document.getElementById('revisionControls').classList.remove('show');
+        document.getElementById('revisionDiff').classList.remove('show');
+        _activeRevisionContent = null;
+        _activeRevisionTimestamp = null;
+        var badge = document.getElementById('revisionBadge');
+        if (badge) { badge.classList.remove('show'); badge.textContent = ''; }
+    };
+
+    window.revertToRevision = function() {
+        if (!_activeRevisionContent || !_activeRevisionTimestamp) return;
+        var d = new Date(parseInt(_activeRevisionTimestamp) * 1000);
+        showConfirm('Replace current file with revision from ' + d.toLocaleString() + '?', function() {
+            var content = _activeRevisionContent;
+            _suppressReloadUntil = Date.now() + 3000;
+            fetch('/api/save_file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: filePath, content: content })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success) {
+                    alert('Revert failed: ' + (data.error || 'unknown error'));
+                    return;
+                }
+                dismissRevisionOverlay();
+                textarea.value = content;
+                updatePreview();
+                hasUnsavedChanges = false;
+                updateUnsavedIndicator();
+                var hp = document.getElementById('historyPanel');
+                if (hp && hp.classList.contains('show')) { loadHistory(); }
+            })
+            .catch(function(err) { alert('Revert failed: ' + err.message); });
+        });
+    };
+
+    window.toggleRevisionDiff = function() {
+        var diffSection = document.getElementById('revisionDiff');
+        var toggle = document.getElementById('revisionDiffToggle');
+        if (diffSection.classList.contains('show')) {
+            diffSection.classList.remove('show');
+            toggle.classList.remove('expanded');
+            return;
+        }
+        if (!_activeRevisionContent) return;
+        var currentContent = textarea.value;
+        var diffHtml = computeUnifiedDiff(currentContent, _activeRevisionContent);
+        diffSection.innerHTML = '<pre>' + diffHtml + '</pre>';
+        diffSection.classList.add('show');
+        toggle.classList.add('expanded');
+    };
 
     function escapeHtml(str) {
         var div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
+    }
+
+    function computeUnifiedDiff(oldText, newText) {
+        if (!oldText || !newText) return '<span class="diff-context">Unable to compute diff</span>';
+        var oldLines = oldText.split('\n');
+        var newLines = newText.split('\n');
+
+        // lcs via dp
+        var m = oldLines.length, n = newLines.length;
+        var dp = [];
+        for (var i = 0; i <= m; i++) {
+            dp[i] = [];
+            for (var j = 0; j <= n; j++) {
+                if (i === 0 || j === 0) dp[i][j] = 0;
+                else if (oldLines[i-1] === newLines[j-1]) dp[i][j] = dp[i-1][j-1] + 1;
+                else dp[i][j] = Math.max(dp[i-1][j], dp[i][j-1]);
+            }
+        }
+
+        // backtrack to build diff ops
+        var ops = [];
+        var oi = m, ni = n;
+        while (oi > 0 || ni > 0) {
+            if (oi > 0 && ni > 0 && oldLines[oi-1] === newLines[ni-1]) {
+                ops.unshift({ type: 'context', text: oldLines[oi-1], oldIdx: oi, newIdx: ni });
+                oi--; ni--;
+            } else if (ni > 0 && (oi === 0 || dp[oi][ni-1] >= dp[oi-1][ni])) {
+                ops.unshift({ type: 'add', text: newLines[ni-1], newIdx: ni });
+                ni--;
+            } else {
+                ops.unshift({ type: 'del', text: oldLines[oi-1], oldIdx: oi });
+                oi--;
+            }
+        }
+
+        // group into hunks with 3 lines of context
+        var hunks = [];
+        var currentHunk = null;
+        var trailingContext = 0;
+
+        for (var k = 0; k < ops.length; k++) {
+            var op = ops[k];
+            if (op.type === 'context') {
+                if (currentHunk) {
+                    currentHunk.lines.push(op);
+                    trailingContext++;
+                    if (trailingContext >= 3) {
+                        // check if there are more changes ahead
+                        var moreChanges = false;
+                        for (var look = k + 1; look < ops.length; look++) {
+                            if (ops[look].type !== 'context') { moreChanges = true; break; }
+                        }
+                        if (!moreChanges || (look - k) > 3) {
+                            hunks.push(currentHunk);
+                            currentHunk = null;
+                            trailingContext = 0;
+                        }
+                    }
+                }
+            } else {
+                trailingContext = 0;
+                if (!currentHunk) {
+                    currentHunk = { lines: [] };
+                    // add up to 3 context lines before this change
+                    var start = k - 1;
+                    var contextCount = 0;
+                    while (start >= 0 && ops[start].type === 'context' && contextCount < 3) {
+                        start--;
+                        contextCount++;
+                    }
+                    for (var c = start + 1; c < k; c++) {
+                        if (ops[c].type === 'context') currentHunk.lines.push(ops[c]);
+                    }
+                }
+                currentHunk.lines.push(op);
+            }
+        }
+        if (currentHunk) hunks.push(currentHunk);
+
+        if (hunks.length === 0) return '<span class="diff-context">No changes</span>';
+
+        var html = '';
+        hunks.forEach(function(hunk) {
+            var firstOld = null, firstNew = null;
+            hunk.lines.forEach(function(l) {
+                if (firstOld === null && l.oldIdx) firstOld = l.oldIdx;
+                if (firstNew === null && l.newIdx) firstNew = l.newIdx;
+            });
+            html += '<span class="diff-hunk">@@ -' + (firstOld || 1) + ' +' + (firstNew || 1) + ' @@</span>\n';
+            hunk.lines.forEach(function(l) {
+                var escaped = escapeHtml(l.text);
+                if (l.type === 'del') html += '<span class="diff-del">-' + escaped + '</span>\n';
+                else if (l.type === 'add') html += '<span class="diff-add">+' + escaped + '</span>\n';
+                else html += '<span class="diff-context"> ' + escaped + '</span>\n';
+            });
+        });
+        return html;
     }
 
     // editor pane resize
@@ -2520,9 +2865,6 @@
     <div class="page-header">
         {% if current_file %}
         <span class="editor-filename">{{ current_file }}</span>
-        {% endif %}
-        <div class="editor-spacer"></div>
-        {% if current_file %}
         <a class="edit-toggle" href="/edit/{{ current_file|safe }}" title="Edit">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -2530,12 +2872,25 @@
             </svg>
         </a>
         {% if has_history %}
-        <span class="header-separator"></span>
-        <button class="editor-btn" onclick="toggleHistory()">History</button>
+        <span class="revision-badge" id="viewRevisionBadge"></span>
+        <span class="revision-controls" id="viewRevisionControls">
+            <span class="header-separator"></span>
+            <button class="revision-diff-toggle" id="viewRevisionDiffToggle" onclick="toggleViewDiff()">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                Show changes
+            </button>
+            <button class="editor-btn" onclick="revertToViewRevision()">Revert to this version</button>
+            <button class="editor-btn" onclick="dismissViewRevision()">Back to current</button>
+        </span>
         {% endif %}
+        {% endif %}
+        <div class="editor-spacer"></div>
+        {% if has_history and current_file %}
+        <button class="editor-btn" onclick="toggleHistory()">History</button>
         {% endif %}
         <img src="/static/mdlive.png" alt="mdlive" class="branding-logo">
     </div>
+    <div id="viewRevisionDiff" class="revision-diff"></div>
     <div id="content">
     {{ content }}
     </div>
@@ -2549,6 +2904,7 @@
     </div>
     <div class="history-list" id="historyList"></div>
 </div>
+<script src="/marked.min.js"></script>
 <script>
 (function() {
     var filePath = {{ current_file|tojson }};
@@ -2578,13 +2934,29 @@
                 }
                 list.innerHTML = '';
                 data.entries.forEach(function(entry) {
-                    var btn = document.createElement('button');
+                    var btn = document.createElement('div');
                     btn.className = 'history-item';
                     var d = new Date(parseInt(entry.timestamp) * 1000);
                     var timeStr = d.toLocaleString();
-                    btn.innerHTML = '<div class="history-item-time">' + timeStr + '</div>' +
+
+                    var content = document.createElement('div');
+                    content.className = 'history-item-content';
+                    content.innerHTML = '<div class="history-item-time">v' + entry.version + ' &middot; ' + timeStr + '</div>' +
                         '<div class="history-item-preview">' + escapeHtml(entry.preview) + '</div>';
-                    btn.onclick = function() { restoreVersion(entry.timestamp); };
+                    content.style.cursor = 'pointer';
+                    content.onclick = function() { restoreVersion(entry.timestamp, entry.version); };
+
+                    var del = document.createElement('button');
+                    del.className = 'history-item-delete';
+                    del.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
+                    del.title = 'Delete revision';
+                    del.onclick = function(e) {
+                        e.stopPropagation();
+                        deleteHistoryEntry(entry.timestamp);
+                    };
+
+                    btn.appendChild(content);
+                    btn.appendChild(del);
                     list.appendChild(btn);
                 });
             })
@@ -2593,9 +2965,249 @@
             });
     }
 
-    function restoreVersion(timestamp) {
-        // open editor with this revision loaded
-        window.location.href = '/edit/' + filePath + '?restore=' + timestamp;
+    var _viewOriginalContent = null;
+    var _viewRevisionContent = null;
+    var _viewRevisionTimestamp = null;
+    var _viewCurrentRawContent = null;
+
+    function deleteHistoryEntry(timestamp) {
+        showConfirm('Delete this revision? This cannot be undone.', function() {
+            fetch('/api/delete_history_entry', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: filePath, timestamp: timestamp })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    if (_viewRevisionTimestamp === timestamp) {
+                        dismissViewRevision();
+                    }
+                    loadHistory();
+                } else {
+                    alert('Failed to delete: ' + (data.error || 'unknown error'));
+                }
+            })
+            .catch(function(err) { alert('Delete failed: ' + err.message); });
+        }, { destructive: true });
+    }
+
+    function restoreVersion(timestamp, version) {
+        fetch('/api/restore_version', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: filePath, timestamp: timestamp })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.content !== undefined) {
+                var contentDiv = document.getElementById('content');
+                if (!_viewOriginalContent) {
+                    _viewOriginalContent = contentDiv.innerHTML;
+                }
+                _viewRevisionContent = data.content;
+                _viewRevisionTimestamp = timestamp;
+                var d = new Date(parseInt(timestamp) * 1000);
+
+                var badge = document.getElementById('viewRevisionBadge');
+                var controls = document.getElementById('viewRevisionControls');
+                var diffSection = document.getElementById('viewRevisionDiff');
+                var diffToggle = document.getElementById('viewRevisionDiffToggle');
+
+                badge.textContent = 'v' + version + ' \u00b7 ' + d.toLocaleString();
+                badge.classList.add('show');
+                controls.classList.add('show');
+
+                diffSection.classList.remove('show');
+                diffSection.innerHTML = '';
+                diffToggle.classList.remove('expanded');
+
+                if (typeof marked !== 'undefined') {
+                    contentDiv.innerHTML = marked.parse(data.content);
+                    if (typeof hljs !== 'undefined') {
+                        contentDiv.querySelectorAll('pre code').forEach(function(block) {
+                            hljs.highlightElement(block);
+                        });
+                    }
+                    if (typeof mermaid !== 'undefined') {
+                        contentDiv.querySelectorAll('.language-mermaid').forEach(function(block) {
+                            var pre = block.closest('pre');
+                            if (!pre) return;
+                            var div = document.createElement('div');
+                            div.className = 'mermaid';
+                            div.textContent = block.textContent;
+                            pre.parentNode.replaceChild(div, pre);
+                        });
+                        mermaid.run();
+                    }
+                } else {
+                    contentDiv.textContent = data.content;
+                }
+            }
+        })
+        .catch(function(err) { alert('Failed to load revision: ' + err.message); });
+    }
+
+    window.dismissViewRevision = function() {
+        var contentDiv = document.getElementById('content');
+        if (_viewOriginalContent) {
+            contentDiv.innerHTML = _viewOriginalContent;
+        }
+        _viewOriginalContent = null;
+        _viewRevisionContent = null;
+        _viewRevisionTimestamp = null;
+        document.getElementById('viewRevisionBadge').classList.remove('show');
+        document.getElementById('viewRevisionBadge').textContent = '';
+        document.getElementById('viewRevisionControls').classList.remove('show');
+        document.getElementById('viewRevisionDiff').classList.remove('show');
+    };
+
+    window.revertToViewRevision = function() {
+        if (!_viewRevisionContent || !_viewRevisionTimestamp) return;
+        var d = new Date(parseInt(_viewRevisionTimestamp) * 1000);
+        showConfirm('Replace current file with revision from ' + d.toLocaleString() + '?', function() {
+            fetch('/api/save_file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: filePath, content: _viewRevisionContent })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.success) {
+                    alert('Revert failed: ' + (data.error || 'unknown error'));
+                    return;
+                }
+                _viewOriginalContent = null;
+                window.location.reload();
+            })
+            .catch(function(err) { alert('Revert failed: ' + err.message); });
+        });
+    };
+
+    window.toggleViewDiff = function() {
+        var diffSection = document.getElementById('viewRevisionDiff');
+        var toggle = document.getElementById('viewRevisionDiffToggle');
+        if (diffSection.classList.contains('show')) {
+            diffSection.classList.remove('show');
+            toggle.classList.remove('expanded');
+            return;
+        }
+        if (!_viewRevisionContent) return;
+
+        // fetch current raw content for diff
+        if (_viewCurrentRawContent !== null) {
+            showViewDiff();
+        } else {
+            fetch('/api/raw_content?path=' + encodeURIComponent(filePath))
+                .then(function(r) { return r.text(); })
+                .then(function(text) {
+                    _viewCurrentRawContent = text;
+                    showViewDiff();
+                })
+                .catch(function() { alert('Failed to load current content for diff'); });
+        }
+    };
+
+    function showViewDiff() {
+        if (!_viewCurrentRawContent || !_viewRevisionContent) return;
+        var diffSection = document.getElementById('viewRevisionDiff');
+        var toggle = document.getElementById('viewRevisionDiffToggle');
+        var diffHtml = computeUnifiedDiff(_viewCurrentRawContent, _viewRevisionContent);
+        diffSection.innerHTML = '<pre>' + diffHtml + '</pre>';
+        diffSection.classList.add('show');
+        toggle.classList.add('expanded');
+    }
+
+    function computeUnifiedDiff(oldText, newText) {
+        if (!oldText || !newText) return '<span class="diff-context">Unable to compute diff</span>';
+        var oldLines = oldText.split('\n');
+        var newLines = newText.split('\n');
+
+        var m = oldLines.length, n = newLines.length;
+        var dp = [];
+        for (var i = 0; i <= m; i++) {
+            dp[i] = [];
+            for (var j = 0; j <= n; j++) {
+                if (i === 0 || j === 0) dp[i][j] = 0;
+                else if (oldLines[i-1] === newLines[j-1]) dp[i][j] = dp[i-1][j-1] + 1;
+                else dp[i][j] = Math.max(dp[i-1][j], dp[i][j-1]);
+            }
+        }
+
+        var ops = [];
+        var oi = m, ni = n;
+        while (oi > 0 || ni > 0) {
+            if (oi > 0 && ni > 0 && oldLines[oi-1] === newLines[ni-1]) {
+                ops.unshift({ type: 'context', text: oldLines[oi-1], oldIdx: oi, newIdx: ni });
+                oi--; ni--;
+            } else if (ni > 0 && (oi === 0 || dp[oi][ni-1] >= dp[oi-1][ni])) {
+                ops.unshift({ type: 'add', text: newLines[ni-1], newIdx: ni });
+                ni--;
+            } else {
+                ops.unshift({ type: 'del', text: oldLines[oi-1], oldIdx: oi });
+                oi--;
+            }
+        }
+
+        var hunks = [];
+        var currentHunk = null;
+        var trailingContext = 0;
+
+        for (var k = 0; k < ops.length; k++) {
+            var op = ops[k];
+            if (op.type === 'context') {
+                if (currentHunk) {
+                    currentHunk.lines.push(op);
+                    trailingContext++;
+                    if (trailingContext >= 3) {
+                        var moreChanges = false;
+                        for (var look = k + 1; look < ops.length; look++) {
+                            if (ops[look].type !== 'context') { moreChanges = true; break; }
+                        }
+                        if (!moreChanges || (look - k) > 3) {
+                            hunks.push(currentHunk);
+                            currentHunk = null;
+                            trailingContext = 0;
+                        }
+                    }
+                }
+            } else {
+                trailingContext = 0;
+                if (!currentHunk) {
+                    currentHunk = { lines: [] };
+                    var start = k - 1;
+                    var contextCount = 0;
+                    while (start >= 0 && ops[start].type === 'context' && contextCount < 3) {
+                        start--;
+                        contextCount++;
+                    }
+                    for (var c = start + 1; c < k; c++) {
+                        if (ops[c].type === 'context') currentHunk.lines.push(ops[c]);
+                    }
+                }
+                currentHunk.lines.push(op);
+            }
+        }
+        if (currentHunk) hunks.push(currentHunk);
+
+        if (hunks.length === 0) return '<span class="diff-context">No changes</span>';
+
+        var html = '';
+        hunks.forEach(function(hunk) {
+            var firstOld = null, firstNew = null;
+            hunk.lines.forEach(function(l) {
+                if (firstOld === null && l.oldIdx) firstOld = l.oldIdx;
+                if (firstNew === null && l.newIdx) firstNew = l.newIdx;
+            });
+            html += '<span class="diff-hunk">@@ -' + (firstOld || 1) + ' +' + (firstNew || 1) + ' @@</span>\n';
+            hunk.lines.forEach(function(l) {
+                var escaped = escapeHtml(l.text);
+                if (l.type === 'del') html += '<span class="diff-del">-' + escaped + '</span>\n';
+                else if (l.type === 'add') html += '<span class="diff-add">+' + escaped + '</span>\n';
+                else html += '<span class="diff-context"> ' + escaped + '</span>\n';
+            });
+        });
+        return html;
     }
 
     function escapeHtml(str) {

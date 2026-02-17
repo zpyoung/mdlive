@@ -51,9 +51,16 @@ pub(crate) struct RestoreVersionRequest {
     timestamp: String,
 }
 
+#[derive(Deserialize)]
+pub(crate) struct DeleteHistoryEntryRequest {
+    path: String,
+    timestamp: String,
+}
+
 #[derive(Serialize)]
 pub(crate) struct HistoryEntry {
     timestamp: String,
+    version: usize,
     preview: String,
 }
 
@@ -472,11 +479,20 @@ pub(crate) async fn api_file_history(
                 .chars()
                 .take(80)
                 .collect();
-            entries.push(HistoryEntry { timestamp, preview });
+            entries.push(HistoryEntry {
+                timestamp,
+                version: 0,
+                preview,
+            });
         }
     }
 
-    entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    // sort oldest first, assign version 1..N, then reverse for newest-first display
+    entries.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    for (i, entry) in entries.iter_mut().enumerate() {
+        entry.version = i + 1;
+    }
+    entries.reverse();
 
     Ok(Json(HistoryResponse {
         success: true,
@@ -525,5 +541,87 @@ pub(crate) async fn api_restore_version(
         success: true,
         content: Some(content),
         error: None,
+    }))
+}
+
+pub(crate) async fn api_delete_history_entry(
+    State(state): State<SharedMarkdownState>,
+    Json(body): Json<DeleteHistoryEntryRequest>,
+) -> Result<Json<ApiResponse>, (StatusCode, Json<ApiResponse>)> {
+    let state = state.lock().await;
+    validate_existing_path(&state.base_dir, &body.path)?;
+
+    let mdlive_dir = match &state.mdlive_dir {
+        Some(d) => d,
+        None => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(ApiResponse {
+                    success: false,
+                    error: Some("history not available".to_string()),
+                    path: None,
+                }),
+            ));
+        }
+    };
+
+    if body.timestamp.contains("..") || body.timestamp.contains('/') {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse {
+                success: false,
+                error: Some("invalid timestamp".to_string()),
+                path: None,
+            }),
+        ));
+    }
+
+    let history_base = mdlive_dir.join("history");
+    let snapshot_path = history_base
+        .join(&body.path)
+        .join(format!("{}.md", body.timestamp));
+
+    if !snapshot_path.exists() {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse {
+                success: false,
+                error: Some("version not found".to_string()),
+                path: None,
+            }),
+        ));
+    }
+
+    // verify snapshot stays within history directory
+    if let Ok(canonical) = snapshot_path.canonicalize() {
+        if let Ok(base) = history_base.canonicalize() {
+            if !canonical.starts_with(&base) {
+                return Err((
+                    StatusCode::FORBIDDEN,
+                    Json(ApiResponse {
+                        success: false,
+                        error: Some("path outside history directory".to_string()),
+                        path: None,
+                    }),
+                ));
+            }
+        }
+    }
+
+    fs::remove_file(&snapshot_path).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse {
+                success: false,
+                error: Some(format!("failed to delete: {e}")),
+                path: None,
+            }),
+        )
+    })?;
+
+    Ok(Json(ApiResponse {
+        success: true,
+        error: None,
+        path: None,
     }))
 }

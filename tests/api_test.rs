@@ -310,6 +310,75 @@ async fn test_api_restore_version() {
     assert_eq!(body["content"], TEST_FILE_1_CONTENT);
 }
 
+#[tokio::test]
+async fn test_api_delete_history_entry() {
+    let (server, temp_dir) = create_directory_server().await;
+
+    // create a snapshot by saving
+    server
+        .post("/api/save_file")
+        .json(&serde_json::json!({"path": "test1.md", "content": "# New content"}))
+        .await;
+
+    // get the timestamp
+    let history_response = server.get("/api/file_history?path=test1.md").await;
+    let history: serde_json::Value = history_response.json();
+    let timestamp = history["entries"][0]["timestamp"].as_str().unwrap();
+
+    // verify snapshot file exists
+    let history_dir = temp_dir.path().join(".mdlive/history/test1.md");
+    let snapshot_path = history_dir.join(format!("{timestamp}.md"));
+    assert!(
+        snapshot_path.exists(),
+        "snapshot should exist before delete"
+    );
+
+    // delete it
+    let response = server
+        .delete("/api/delete_history_entry")
+        .json(&serde_json::json!({"path": "test1.md", "timestamp": timestamp}))
+        .await;
+    assert_eq!(response.status_code(), 200);
+    let body: serde_json::Value = response.json();
+    assert_eq!(body["success"], true);
+
+    // verify snapshot is gone
+    assert!(!snapshot_path.exists(), "snapshot should be deleted");
+
+    // verify history is now empty
+    let history_response = server.get("/api/file_history?path=test1.md").await;
+    let history: serde_json::Value = history_response.json();
+    assert_eq!(
+        history["entries"].as_array().unwrap().len(),
+        0,
+        "history should be empty after delete"
+    );
+}
+
+#[tokio::test]
+async fn test_api_delete_history_entry_not_found() {
+    let (server, _temp_dir) = create_directory_server().await;
+
+    let response = server
+        .delete("/api/delete_history_entry")
+        .json(&serde_json::json!({"path": "test1.md", "timestamp": "9999999999"}))
+        .await;
+    assert_eq!(response.status_code(), 404);
+}
+
+#[tokio::test]
+async fn test_api_delete_history_entry_traversal_blocked() {
+    let (server, _temp_dir) = create_directory_server().await;
+
+    let response = server
+        .delete("/api/delete_history_entry")
+        .json(&serde_json::json!({"path": "test1.md", "timestamp": "../../etc/passwd"}))
+        .await;
+    assert_eq!(response.status_code(), 403);
+    let body: serde_json::Value = response.json();
+    assert_eq!(body["success"], false);
+}
+
 // editor page tests
 
 #[tokio::test]

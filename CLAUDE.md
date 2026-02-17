@@ -12,6 +12,7 @@ single-file and directory modes.
 
 ```bash
 cargo build --release
+cargo fmt                             # run after any Rust changes
 cargo test                            # all tests (unit + integration)
 cargo test util::tests                # run tests for a specific module
 cargo test --test api_test            # run a specific integration test file
