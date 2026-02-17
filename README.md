@@ -8,17 +8,9 @@ I built this to sit next to AI coding agents. When an agent writes markdown -- p
 
 This started as a fork of Jose Fernandez's [mdserve](https://github.com/jfernandez/mdserve). The original idea and core implementation are his. I've since taken it in a different direction: in-browser editing, file CRUD, version history, keyboard shortcuts, theming. Different enough to warrant its own repo.
 
-<video src="docs/images/mdlive.mp4" controls muted width="100%"></video>
+https://github.com/bearded-giant/mdlive/raw/main/docs/images/mdlive.mp4
 
 ## Install
-
-From crates.io:
-
-```bash
-cargo install mdlive
-```
-
-From source:
 
 ```bash
 git clone https://github.com/bearded-giant/mdlive.git
