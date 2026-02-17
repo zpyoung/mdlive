@@ -442,7 +442,7 @@ async fn test_editor_context_menu_has_edit() {
     let response = server.get("/test1.md").await;
     let body = response.text();
     assert!(
-        body.contains("'Edit'"),
+        body.contains("\"Edit\"") || body.contains("'Edit'"),
         "context menu JS should include Edit option"
     );
 }

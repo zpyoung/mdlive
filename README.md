@@ -64,9 +64,9 @@ Every markdown file has a built-in editor accessible via the edit icon or the `e
 
 Full CRUD from the browser. Create new files, rename/move existing ones, delete with confirmation. All operations available from both the right-click context menu (on sidebar items) and from buttons in the editor header. In single-file mode, right-click the content area for the context menu.
 
-### Version history
+### Revisions
 
-Every save creates a timestamped snapshot in a `.mdlive/` directory next to your files. Open the history panel (`h` shortcut or History button) to browse previous versions and restore any of them. You'll probably want to add `.mdlive` to your `.gitignore` unless you want doc history in your repo -- which can actually be handy for shared design docs or architecture decisions.
+Every save creates a timestamped snapshot in a `.mdlive/` directory next to your files. Open the revisions panel (`h` or `r` shortcut, or the Revisions button) to browse previous versions and restore any of them. You'll probably want to add `.mdlive` to your `.gitignore` unless you want revision history in your repo -- which can actually be handy for shared design docs or architecture decisions.
 
 ### Directory mode
 
@@ -85,7 +85,7 @@ Press `/` to see all available shortcuts. Shortcuts are suppressed when typing i
 | `k` | Toggle sidebar |
 | `s` | Focus search |
 | `Ctrl+S` | Save |
-| `h` | Toggle history |
+| `h` / `r` | Toggle revisions |
 | `Esc` | Close / cancel |
 
 ## Usage
