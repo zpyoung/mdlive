@@ -65,14 +65,10 @@ impl MarkdownState {
             );
         }
 
-        let mdlive_dir = if is_directory_mode {
-            let dir = base_dir.join(".mdlive");
-            let history = dir.join("history");
-            let _ = fs::create_dir_all(&history);
-            Some(dir)
-        } else {
-            None
-        };
+        let dir = base_dir.join(".mdlive");
+        let history = dir.join("history");
+        let _ = fs::create_dir_all(&history);
+        let mdlive_dir = Some(dir);
 
         Ok(MarkdownState {
             base_dir,

@@ -4,7 +4,10 @@ Acme Platform is an internal developer toolkit for building, deploying, and moni
 
 ## Features
 
+Foo
+Bar
 
+Baz
 
 | Feature | Status | Since |
 |---------|--------|-------|
