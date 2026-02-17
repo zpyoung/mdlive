@@ -8,6 +8,8 @@ I built this to sit next to AI coding agents. When an agent writes markdown -- p
 
 This started as a fork of Jose Fernandez's [mdserve](https://github.com/jfernandez/mdserve). The original idea and core implementation are his. I've since taken it in a different direction: in-browser editing, file CRUD, version history, keyboard shortcuts, theming. Different enough to warrant its own repo.
 
+<video src="docs/images/mdlive.mp4" controls muted width="100%"></video>
+
 ## Install
 
 From crates.io:
@@ -33,6 +35,12 @@ Single binary, no runtime dependencies. Everything (templates, JS libraries, ima
 mdlive README.md         # single file, opens browser
 mdlive docs/             # directory mode with sidebar
 ```
+
+#### Single file view
+![Single file view](docs/images/single-view.png)
+
+#### Directory view
+![Directory view](docs/images/dir-view.png)
 
 It watches for changes and reloads instantly via WebSocket. New files in directory mode get picked up automatically. The browser opens on launch by default (pass `--no-open` to suppress).
 
@@ -64,9 +72,13 @@ Every markdown file has a built-in editor accessible via the edit icon or the `e
 
 Full CRUD from the browser. Create new files, rename/move existing ones, delete with confirmation. All operations available from both the right-click context menu (on sidebar items) and from buttons in the editor header. In single-file mode, right-click the content area for the context menu.
 
+<img src="docs/images/context-menu.png" alt="Context menu" width="425">
+
 ### Revisions
 
 Every save creates a timestamped snapshot in a `.mdlive/` directory next to your files. Open the revisions panel (`h` or `r` shortcut, or the Revisions button) to browse previous versions and restore any of them. You'll probably want to add `.mdlive` to your `.gitignore` unless you want revision history in your repo -- which can actually be handy for shared design docs or architecture decisions.
+
+<img src="docs/images/revision-sidebar.jpg" alt="Revision history" width="365"> <img src="docs/images/revision-detail.png" alt="Revision detail with diff" width="500">
 
 ### Directory mode
 
@@ -75,6 +87,7 @@ Pass a directory and mdlive recursively finds all `.md` and `.markdown` files, b
 ### Keyboard shortcuts
 
 Press `/` to see all available shortcuts. Shortcuts are suppressed when typing in inputs, when modifier keys are held, and when dialogs are open.
+
 
 | Key | Action |
 |-----|--------|
