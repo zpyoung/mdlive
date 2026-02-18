@@ -1,0 +1,8 @@
+{
+  "name": "mdlive",
+  "description": "Serve markdown files as live-reloading HTML previews in the browser with live reload, editing, and revision history",
+  "version": "1.0.0",
+  "author": {
+    "name": "bearded-giant"
+  }
+}
