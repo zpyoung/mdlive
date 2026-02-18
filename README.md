@@ -21,6 +21,14 @@ cargo build --release
 
 Single binary, no runtime dependencies. Everything (templates, JS libraries, images) is embedded at compile time.
 
+### Claude Code plugin
+
+mdlive is available as a [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin. Once installed, Claude will automatically use mdlive to preview markdown when it makes sense -- plans, architecture docs, tables, diagrams, and anything that reads better rendered than raw.
+
+```
+/plugin install mdlive@bearded-giant/mdlive
+```
+
 ## Quick start
 
 ```bash

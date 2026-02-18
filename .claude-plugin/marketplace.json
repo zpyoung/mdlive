@@ -12,7 +12,7 @@
       "name": "mdlive",
       "description": "Serve markdown files as live-reloading HTML previews in the browser",
       "version": "1.0.0",
-      "source": ".",
+      "source": "./plugin",
       "category": "productivity"
     }
   ]
