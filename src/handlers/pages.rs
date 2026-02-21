@@ -11,7 +11,7 @@ use std::fs;
 use crate::state::{MarkdownState, SharedMarkdownState};
 use crate::template::{template_env, TEMPLATE_NAME};
 use crate::tree::build_file_tree;
-use crate::util::is_image_file;
+use crate::util::{file_type_class, is_image_file, is_supported_file};
 
 use super::static_files::serve_static_file_inner;
 
@@ -36,14 +36,14 @@ pub(crate) async fn serve_html_root(State(state): State<SharedMarkdownState>) ->
 
     let _ = state.refresh_file(&filename);
 
-    render_markdown(&state, &filename).await
+    render_file(&state, &filename).await
 }
 
 pub(crate) async fn serve_file(
     AxumPath(filepath): AxumPath<String>,
     State(state): State<SharedMarkdownState>,
 ) -> axum::response::Response {
-    if filepath.ends_with(".md") || filepath.ends_with(".markdown") {
+    if is_supported_file(std::path::Path::new(&filepath)) {
         let mut state = state.lock().await;
 
         if !state.tracked_files.contains_key(&filepath) {
@@ -52,7 +52,7 @@ pub(crate) async fn serve_file(
 
         let _ = state.refresh_file(&filepath);
 
-        let (status, html) = render_markdown(&state, &filepath).await;
+        let (status, html) = render_file(&state, &filepath).await;
         (status, html).into_response()
     } else if is_image_file(&filepath) {
         serve_static_file_inner(filepath, state).await
@@ -61,7 +61,7 @@ pub(crate) async fn serve_file(
     }
 }
 
-pub(crate) async fn render_markdown(
+pub(crate) async fn render_file(
     state: &MarkdownState,
     current_file: &str,
 ) -> (StatusCode, Html<String>) {
@@ -76,15 +76,17 @@ pub(crate) async fn render_markdown(
         }
     };
 
+    let file_type = file_type_class(current_file);
+
     let (content, has_mermaid) = if let Some(tracked) = state.tracked_files.get(current_file) {
         let html = &tracked.html;
-        let mermaid = html.contains(r#"class="language-mermaid""#);
+        let mermaid = file_type == "markdown" && html.contains(r#"class="language-mermaid""#);
         (Value::from_safe_string(html.clone()), mermaid)
     } else {
         return (StatusCode::NOT_FOUND, Html("File not found".to_string()));
     };
 
-    let has_history = state.mdlive_dir.is_some();
+    let has_history = state.mdlive_dir.is_some() && file_type == "markdown";
 
     let rendered = if state.show_navigation() {
         let filenames = state.get_sorted_filenames();
@@ -92,6 +94,7 @@ pub(crate) async fn render_markdown(
 
         match template.render(context! {
             content => content,
+            file_type => file_type,
             mermaid_enabled => has_mermaid,
             show_navigation => true,
             has_history => has_history,
@@ -109,6 +112,7 @@ pub(crate) async fn render_markdown(
     } else {
         match template.render(context! {
             content => content,
+            file_type => file_type,
             mermaid_enabled => has_mermaid,
             show_navigation => false,
             has_history => has_history,
@@ -182,7 +186,8 @@ fn render_editor(
         }
     };
 
-    let has_history = state.mdlive_dir.is_some() && !new_file_mode;
+    let file_type = file_type_class(current_file);
+    let has_history = state.mdlive_dir.is_some() && !new_file_mode && file_type == "markdown";
 
     let rendered = if state.show_navigation() {
         let filenames = state.get_sorted_filenames();
@@ -191,6 +196,7 @@ fn render_editor(
         match template.render(context! {
             editor_mode => true,
             new_file_mode => new_file_mode,
+            file_type => file_type,
             raw_content => raw_content,
             current_file => current_file,
             has_history => has_history,
@@ -209,6 +215,7 @@ fn render_editor(
         match template.render(context! {
             editor_mode => true,
             new_file_mode => new_file_mode,
+            file_type => file_type,
             raw_content => raw_content,
             current_file => current_file,
             has_history => has_history,

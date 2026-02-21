@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::state::{ServerMessage, SharedMarkdownState};
-use crate::util::is_markdown_file;
+use crate::util::is_supported_file;
 
 #[derive(Deserialize)]
 pub(crate) struct RawContentQuery {
@@ -144,12 +144,12 @@ fn validate_new_path(
         ));
     }
     let full = base_dir.join(relative);
-    if !is_markdown_file(&full) {
+    if !is_supported_file(&full) {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(ApiResponse {
                 success: false,
-                error: Some("only .md and .markdown extensions allowed".to_string()),
+                error: Some("only .md, .markdown, .txt, and .json extensions allowed".to_string()),
                 path: None,
             }),
         ));
@@ -334,9 +334,15 @@ pub(crate) async fn api_create_file(
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("new");
-    let content = body
-        .content
-        .unwrap_or_else(|| format!("# {}\n", filename_stem));
+    let content = body.content.unwrap_or_else(|| {
+        if crate::util::is_json_file(&target_full) {
+            "{}\n".to_string()
+        } else if crate::util::is_text_file(&target_full) {
+            String::new()
+        } else {
+            format!("# {}\n", filename_stem)
+        }
+    });
 
     fs::write(&target_full, &content).map_err(|e| {
         (

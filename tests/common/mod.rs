@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use axum_test::TestServer;
-use mdlive::{new_router, scan_markdown_files};
+use mdlive::{new_router, scan_supported_files};
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -64,7 +64,7 @@ fn create_directory_server_impl(use_http: bool) -> (TestServer, TempDir) {
         .expect("Failed to write test3.md");
 
     let base_dir = temp_dir.path().to_path_buf();
-    let tracked_files = scan_markdown_files(&base_dir).expect("Failed to scan markdown files");
+    let tracked_files = scan_supported_files(&base_dir).expect("Failed to scan markdown files");
 
     let router = new_router(base_dir, tracked_files, true).expect("Failed to create router");
 

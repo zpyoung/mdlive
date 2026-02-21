@@ -380,6 +380,11 @@
           min-height: 100vh;
       }
 
+      #content.content-code {
+          max-width: none;
+          padding: 12px 20px;
+      }
+
       /* Sidebar Toggle Button */
       .sidebar-toggle {
           position: fixed;
@@ -573,6 +578,12 @@
           font-size: 14px;
           color: var(--text-color);
           line-height: 1.5;
+      }
+
+      .alert-dialog-detail {
+          font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+          font-size: 13px;
+          opacity: 0.8;
       }
 
       .file-dialog-btn-destructive {
@@ -1046,6 +1057,26 @@
           opacity: 0.4;
       }
 
+      .editor-btn-toggle {
+          padding: 4px 8px;
+          border: 1px solid transparent;
+          opacity: 0.5;
+      }
+
+      .editor-btn-toggle.active {
+          opacity: 0.9;
+          border-color: var(--border-color);
+      }
+
+      .editor-panes.preview-hidden .editor-pane-resize-handle,
+      .editor-panes.preview-hidden #previewPaneWrapper {
+          display: none;
+      }
+
+      .editor-panes.preview-hidden .editor-pane:first-child {
+          flex: 1;
+      }
+
       .editor-btn-icon:hover {
           opacity: 1;
           background: var(--border-color-light);
@@ -1216,6 +1247,10 @@
 
       .editor-pane:first-child {
           flex: 0 0 var(--editor-split, 50%);
+      }
+
+      .editor-panes:not(:has(#previewPaneWrapper)) .editor-pane:first-child {
+          flex: 1;
       }
 
       .editor-pane-resize-handle {
@@ -1425,11 +1460,16 @@
       }
 
       .page-container #content {
-          margin-left: max(0px, calc((100vw - var(--sidebar-width) - var(--content-max-width)) / 2));
+          margin-left: max(0px, calc((100vw - var(--sidebar-width) - var(--content-max-width)) / 4));
       }
 
       body.sidebar-collapsed .page-container #content {
-          margin-left: max(0px, calc((100vw - var(--sidebar-collapsed-width) - var(--content-max-width)) / 2));
+          margin-left: max(0px, calc((100vw - var(--sidebar-collapsed-width) - var(--content-max-width)) / 4));
+      }
+
+      .page-container #content.content-code,
+      body.sidebar-collapsed .page-container #content.content-code {
+          margin-left: 0;
       }
       {% endif %}
 
@@ -2060,6 +2100,16 @@
         _confirmDialogCallback = null;
       }
 
+      function showAlert(title, detail) {
+        document.getElementById("alertDialogTitle").textContent = title;
+        document.getElementById("alertDialogMessage").textContent = detail || "";
+        document.getElementById("alertDialog").classList.add("show");
+      }
+
+      function closeAlertDialog() {
+        document.getElementById("alertDialog").classList.remove("show");
+      }
+
       // Auto-refresh functionality using WebSocket
       function setupLiveReload() {
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -2166,10 +2216,20 @@
           });
         }
 
+        // Alert dialog events
+        var alertOverlay = document.getElementById("alertDialog");
+        if (alertOverlay) {
+          alertOverlay.addEventListener("click", function (e) {
+            if (e.target === alertOverlay) closeAlertDialog();
+          });
+        }
+
         // Close modals with ESC key
         document.addEventListener("keydown", function (e) {
           if (e.key === "Escape") {
-            if (confirmOverlay && confirmOverlay.classList.contains("show")) {
+            if (alertOverlay && alertOverlay.classList.contains("show")) {
+              closeAlertDialog();
+            } else if (confirmOverlay && confirmOverlay.classList.contains("show")) {
               closeConfirmDialog();
             } else if (
               fileDialogOverlay &&
@@ -2281,6 +2341,18 @@
       </div>
     </div>
 
+    <div id="alertDialog" class="file-dialog-overlay">
+      <div class="file-dialog">
+        <h3 id="alertDialogTitle"></h3>
+        <p class="confirm-dialog-message alert-dialog-detail" id="alertDialogMessage"></p>
+        <div class="file-dialog-buttons">
+          <button class="file-dialog-btn-confirm" onclick="closeAlertDialog()">
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+
     <button
       class="shortcuts-toggle"
       onclick="openShortcutsModal()"
@@ -2367,6 +2439,19 @@
           </button>
         </span>
         <div class="editor-spacer"></div>
+        {% if file_type == "markdown" %}
+        <button
+          class="editor-btn editor-btn-toggle active"
+          id="previewToggle"
+          onclick="togglePreviewPane()"
+          title="Toggle preview"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="18" rx="2" ry="2"></rect>
+            <line x1="12" y1="3" x2="12" y2="21"></line>
+          </svg>
+        </button>
+        {% endif %}
         <button class="editor-btn" onclick="editorCancel()">Close</button>
         <button
           class="editor-btn editor-btn-save"
@@ -2401,10 +2486,12 @@
 {{ raw_content }}</textarea
           >
         </div>
+        {% if file_type == "markdown" %}
         <div class="editor-pane-resize-handle" id="editorResizeHandle"></div>
-        <div class="editor-pane">
+        <div class="editor-pane" id="previewPaneWrapper">
           <div id="editorPreview" class="editor-preview markdown-body"></div>
         </div>
+        {% endif %}
         <div class="revision-overlay" id="revisionOverlay">
           <div class="revision-diff" id="revisionDiff"></div>
           <div
@@ -2430,10 +2517,11 @@
       (function() {
           var textarea = document.getElementById('editorTextarea');
           var lineNumbers = document.getElementById('lineNumbers');
-          var preview = document.getElementById('editorPreview');
+          var preview = document.getElementById('editorPreview'); // null for non-markdown
           var saveBtn = document.getElementById('editorSaveBtn');
           var isNewFile = {{ new_file_mode|default(false)|lower }};
           var filePath = {{ current_file|tojson }};
+          var fileType = {{ file_type|default("markdown")|tojson }};
           var debounceTimer = null;
           var hasUnsavedChanges = false;
           var editorHeader = document.querySelector('.editor-header');
@@ -2490,6 +2578,7 @@
           }
 
           function updatePreview() {
+              if (!preview) return;
               if (typeof marked !== 'undefined') {
                   preview.innerHTML = marked.parse(textarea.value);
                   if (typeof hljs !== 'undefined') {
@@ -2563,6 +2652,8 @@
               // let modal handlers close their own dialogs first
               var shortcuts = document.getElementById('shortcutsModal');
               if (shortcuts && shortcuts.classList.contains('show')) return;
+              var ad = document.getElementById('alertDialog');
+              if (ad && ad.classList.contains('show')) return;
               var cd = document.getElementById('confirmDialog');
               if (cd && cd.classList.contains('show')) return;
               var fd = document.getElementById('fileDialog');
@@ -2624,6 +2715,20 @@
                   : filePath;
 
               if (!path) return;
+
+              // json: validate and pretty-print before saving
+              var savingJson = path.toLowerCase().endsWith('.json') || fileType === 'json';
+              if (savingJson && content.trim()) {
+                  try {
+                      var parsed = JSON.parse(content);
+                      content = JSON.stringify(parsed, null, 2) + '\n';
+                      textarea.value = content;
+                      updateLineNumbers();
+                  } catch(e) {
+                      showAlert('Invalid JSON', e.message);
+                      return;
+                  }
+              }
 
               var endpoint = isNewFile ? '/api/create_file' : '/api/save_file';
               var body = isNewFile
@@ -3104,6 +3209,26 @@
               });
           }
 
+          // preview toggle (markdown only)
+          var previewToggleBtn = document.getElementById('previewToggle');
+          if (previewToggleBtn) {
+              var editorPanes = document.querySelector('.editor-panes');
+              var previewVisible = localStorage.getItem('preview-visible') !== 'false';
+
+              function applyPreviewState() {
+                  editorPanes.classList.toggle('preview-hidden', !previewVisible);
+                  previewToggleBtn.classList.toggle('active', previewVisible);
+              }
+
+              window.togglePreviewPane = function() {
+                  previewVisible = !previewVisible;
+                  localStorage.setItem('preview-visible', previewVisible);
+                  applyPreviewState();
+              };
+
+              applyPreviewState();
+          }
+
           // scroll sync: textarea -> line numbers + preview
           var previewPane = preview.parentElement;
           textarea.addEventListener('scroll', function() {
@@ -3172,7 +3297,7 @@
         <img src="/static/mdlive.png" alt="mdlive" class="branding-logo" />
       </div>
       <div id="viewRevisionDiff" class="revision-diff"></div>
-      <div id="content">{{ content }}</div>
+      <div id="content" {% if file_type != "markdown" %}class="content-code"{% endif %}>{{ content }}</div>
     </div>
 
     {% if has_history and not editor_mode %}
@@ -3653,6 +3778,8 @@
           }
 
           // defer to existing escape handlers for other modals
+          var alertDialog = document.getElementById('alertDialog');
+          if (alertDialog && alertDialog.classList.contains('show')) return;
           if (themeModal && themeModal.classList.contains('show')) return;
           if (confirmDialog && confirmDialog.classList.contains('show')) return;
           if (fileDialog && fileDialog.classList.contains('show')) return;

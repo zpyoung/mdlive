@@ -13,7 +13,7 @@ use tokio::net::TcpListener;
 
 pub use router::new_router;
 pub use state::ServerMessage;
-pub use util::scan_markdown_files;
+pub use util::scan_supported_files;
 
 pub async fn serve_markdown(
     base_dir: PathBuf,

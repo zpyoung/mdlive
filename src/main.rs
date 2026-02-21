@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
 
-use mdlive::{scan_markdown_files, serve_markdown};
+use mdlive::{scan_supported_files, serve_markdown};
 
 #[derive(Parser)]
 #[command(name = "mdlive")]
@@ -38,9 +38,9 @@ async fn main() -> Result<()> {
         let tracked_files = vec![absolute_path];
         (base_dir, tracked_files, false)
     } else if absolute_path.is_dir() {
-        let tracked_files = scan_markdown_files(&absolute_path)?;
+        let tracked_files = scan_supported_files(&absolute_path)?;
         if tracked_files.is_empty() {
-            anyhow::bail!("No markdown files found in directory");
+            anyhow::bail!("No supported files found in directory (.md, .txt, .json)");
         }
         (absolute_path, tracked_files, true)
     } else {

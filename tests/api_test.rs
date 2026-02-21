@@ -126,7 +126,7 @@ async fn test_api_move_file_non_md_target() {
 
     let response = server
         .post("/api/move_file")
-        .json(&serde_json::json!({"path": "test1.md", "target": "test1.txt"}))
+        .json(&serde_json::json!({"path": "test1.md", "target": "test1.sh"}))
         .await;
     assert_eq!(response.status_code(), 400);
 }

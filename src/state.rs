@@ -1,7 +1,15 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::PathBuf, sync::Arc, time::SystemTime};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::SystemTime,
+};
 use tokio::sync::{broadcast, Mutex};
+
+use crate::util::is_markdown_file;
 
 pub(crate) type SharedMarkdownState = Arc<Mutex<MarkdownState>>;
 
@@ -46,7 +54,7 @@ impl MarkdownState {
             let metadata = fs::metadata(&file_path)?;
             let last_modified = metadata.modified()?;
             let content = fs::read_to_string(&file_path)?;
-            let html = Self::markdown_to_html(&content)?;
+            let html = Self::render_file_to_html(&file_path, &content)?;
 
             let canonical = file_path.canonicalize().unwrap_or(file_path);
             let key = canonical
@@ -96,7 +104,7 @@ impl MarkdownState {
 
             if current_modified > tracked.last_modified {
                 let content = fs::read_to_string(&tracked.path)?;
-                tracked.html = Self::markdown_to_html(&content)?;
+                tracked.html = Self::render_file_to_html(&tracked.path, &content)?;
                 tracked.last_modified = current_modified;
             }
         }
@@ -121,9 +129,9 @@ impl MarkdownState {
         self.tracked_files.insert(
             key,
             TrackedFile {
-                path: file_path,
+                path: file_path.clone(),
                 last_modified: metadata.modified()?,
-                html: Self::markdown_to_html(&content)?,
+                html: Self::render_file_to_html(&file_path, &content)?,
             },
         );
 
@@ -132,6 +140,14 @@ impl MarkdownState {
 
     pub(crate) fn remove_tracked_file(&mut self, key: &str) -> bool {
         self.tracked_files.remove(key).is_some()
+    }
+
+    pub(crate) fn render_file_to_html(path: &Path, content: &str) -> Result<String> {
+        if is_markdown_file(path) {
+            Self::markdown_to_html(content)
+        } else {
+            Ok(Self::text_to_html(path, content))
+        }
     }
 
     pub(crate) fn markdown_to_html(content: &str) -> Result<String> {
@@ -143,5 +159,19 @@ impl MarkdownState {
             .unwrap_or_else(|_| "Error parsing markdown".to_string());
 
         Ok(html_body)
+    }
+
+    fn text_to_html(path: &Path, content: &str) -> String {
+        let lang = if crate::util::is_json_file(path) {
+            "json"
+        } else {
+            "plaintext"
+        };
+        let escaped = content
+            .replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;");
+        format!("<pre><code class=\"language-{lang}\">{escaped}</code></pre>")
     }
 }

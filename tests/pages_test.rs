@@ -1,7 +1,7 @@
 mod common;
 
 use common::*;
-use mdlive::{new_router, scan_markdown_files};
+use mdlive::{new_router, scan_supported_files};
 use std::fs;
 use tempfile::tempdir;
 
@@ -375,7 +375,7 @@ async fn test_directory_mode_serves_nested_files() {
     fs::write(docs_dir.join("guide.md"), "# Guide\n\nGuide content").expect("Failed to write");
 
     let base_dir = temp_dir.path().to_path_buf();
-    let tracked_files = scan_markdown_files(&base_dir).expect("Failed to scan");
+    let tracked_files = scan_supported_files(&base_dir).expect("Failed to scan");
     let router = new_router(base_dir, tracked_files, true).expect("Failed to create router");
     let server = TestServer::new(router).expect("Failed to create test server");
 
@@ -397,7 +397,7 @@ async fn test_directory_mode_tree_sidebar() {
     fs::write(docs_dir.join("guide.md"), "# Guide").expect("Failed to write");
 
     let base_dir = temp_dir.path().to_path_buf();
-    let tracked_files = scan_markdown_files(&base_dir).expect("Failed to scan");
+    let tracked_files = scan_supported_files(&base_dir).expect("Failed to scan");
     let router = new_router(base_dir, tracked_files, true).expect("Failed to create router");
     let server = TestServer::new(router).expect("Failed to create test server");
 
@@ -423,7 +423,7 @@ async fn test_nested_file_active_highlighting() {
     fs::write(docs_dir.join("guide.md"), "# Guide").expect("Failed to write");
 
     let base_dir = temp_dir.path().to_path_buf();
-    let tracked_files = scan_markdown_files(&base_dir).expect("Failed to scan");
+    let tracked_files = scan_supported_files(&base_dir).expect("Failed to scan");
     let router = new_router(base_dir, tracked_files, true).expect("Failed to create router");
     let server = TestServer::new(router).expect("Failed to create test server");
 

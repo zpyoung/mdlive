@@ -2,7 +2,7 @@ use notify::Event;
 use std::path::Path;
 
 use crate::state::{ServerMessage, SharedMarkdownState};
-use crate::util::{is_image_file, is_markdown_file};
+use crate::util::{is_image_file, is_supported_file};
 
 fn is_mdlive_path(path: &Path) -> bool {
     path.components().any(|c| c.as_os_str() == ".mdlive")
@@ -19,19 +19,19 @@ pub(crate) async fn handle_file_event(event: Event, state: &SharedMarkdownState)
                 RenameMode::Both => {
                     if event.paths.len() == 2 {
                         let new_path = &event.paths[1];
-                        handle_markdown_file_change(new_path, state).await;
+                        handle_file_change(new_path, state).await;
                     }
                 }
                 RenameMode::From => {}
                 RenameMode::To => {
                     if let Some(path) = event.paths.first() {
-                        handle_markdown_file_change(path, state).await;
+                        handle_file_change(path, state).await;
                     }
                 }
                 RenameMode::Any => {
                     if let Some(path) = event.paths.first() {
                         if path.exists() {
-                            handle_markdown_file_change(path, state).await;
+                            handle_file_change(path, state).await;
                         }
                     }
                 }
@@ -40,11 +40,11 @@ pub(crate) async fn handle_file_event(event: Event, state: &SharedMarkdownState)
         }
         _ => {
             for path in &event.paths {
-                if is_markdown_file(path) {
+                if is_supported_file(path) {
                     match event.kind {
                         notify::EventKind::Create(_)
                         | notify::EventKind::Modify(notify::event::ModifyKind::Data(_)) => {
-                            handle_markdown_file_change(path, state).await;
+                            handle_file_change(path, state).await;
                         }
                         notify::EventKind::Remove(_) => {
                             // don't remove files from tracking -- editors like neovim save by
@@ -69,8 +69,8 @@ pub(crate) async fn handle_file_event(event: Event, state: &SharedMarkdownState)
     }
 }
 
-async fn handle_markdown_file_change(path: &Path, state: &SharedMarkdownState) {
-    if !is_markdown_file(path) {
+async fn handle_file_change(path: &Path, state: &SharedMarkdownState) {
+    if !is_supported_file(path) {
         return;
     }
 
