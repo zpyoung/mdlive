@@ -1236,8 +1236,30 @@
           cursor: col-resize;
       }
 
+      .editor-pane-edit {
+          display: flex;
+          overflow: hidden;
+      }
+
+      .line-numbers {
+          flex-shrink: 0;
+          width: 48px;
+          padding: 20px 8px 20px 0;
+          text-align: right;
+          font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+          font-size: 14px;
+          line-height: 1.6;
+          color: var(--blockquote-color);
+          background: var(--code-bg);
+          border-right: 1px solid var(--border-color);
+          overflow: hidden;
+          user-select: none;
+          white-space: pre;
+      }
+
       .editor-pane textarea {
-          width: 100%;
+          flex: 1;
+          min-width: 0;
           height: 100%;
           resize: none;
           border: none;
@@ -2373,7 +2395,8 @@
         <img src="/static/mdlive.png" alt="mdlive" class="branding-logo" />
       </div>
       <div class="editor-panes" style="position: relative">
-        <div class="editor-pane">
+        <div class="editor-pane editor-pane-edit">
+          <div class="line-numbers" id="lineNumbers"></div>
           <textarea id="editorTextarea" spellcheck="false">
 {{ raw_content }}</textarea
           >
@@ -2406,6 +2429,7 @@
     <script>
       (function() {
           var textarea = document.getElementById('editorTextarea');
+          var lineNumbers = document.getElementById('lineNumbers');
           var preview = document.getElementById('editorPreview');
           var saveBtn = document.getElementById('editorSaveBtn');
           var isNewFile = {{ new_file_mode|default(false)|lower }};
@@ -2458,6 +2482,13 @@
               });
           }
 
+          function updateLineNumbers() {
+              var count = textarea.value.split('\n').length;
+              var nums = '';
+              for (var i = 1; i <= count; i++) nums += i + '\n';
+              lineNumbers.textContent = nums;
+          }
+
           function updatePreview() {
               if (typeof marked !== 'undefined') {
                   preview.innerHTML = marked.parse(textarea.value);
@@ -2470,6 +2501,7 @@
           }
 
           // initial render
+          updateLineNumbers();
           updatePreview();
 
           // live preview with debounce
@@ -2478,6 +2510,7 @@
                   hasUnsavedChanges = true;
                   updateUnsavedIndicator();
               }
+              updateLineNumbers();
               clearTimeout(debounceTimer);
               debounceTimer = setTimeout(updatePreview, 300);
           });
@@ -2911,6 +2944,7 @@
                       }
                       dismissRevisionOverlay();
                       textarea.value = content;
+                      updateLineNumbers();
                       updatePreview();
                       hasUnsavedChanges = false;
                       updateUnsavedIndicator();
@@ -3070,9 +3104,10 @@
               });
           }
 
-          // scroll sync: textarea -> preview (line-ratio)
+          // scroll sync: textarea -> line numbers + preview
           var previewPane = preview.parentElement;
           textarea.addEventListener('scroll', function() {
+              lineNumbers.scrollTop = this.scrollTop;
               var max = this.scrollHeight - this.clientHeight;
               if (max <= 0) return;
               var ratio = this.scrollTop / max;
