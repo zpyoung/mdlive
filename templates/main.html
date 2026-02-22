@@ -302,13 +302,34 @@
       }
 
       .file-tree a {
-          display: block;
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
+          gap: 8px;
           padding: 6px 12px;
           color: var(--text-color);
           text-decoration: none;
           border-radius: 6px;
           transition: background 0.2s var(--transition-timing);
           font-size: 14px;
+      }
+
+      .file-tree a .file-name {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          min-width: 0;
+      }
+
+      .file-tree a .file-ts {
+          font-size: 11px;
+          color: var(--blockquote-color);
+          white-space: nowrap;
+          flex-shrink: 0;
+      }
+
+      .file-tree.sort-by-name .file-ts {
+          display: none;
       }
 
       .file-tree a:hover,
@@ -350,6 +371,34 @@
       }
 
       body.sidebar-collapsed .sidebar-search {
+          opacity: 0;
+          pointer-events: none;
+      }
+
+      .sidebar-sort {
+          padding: 0 20px 12px 20px;
+      }
+
+      .sidebar-sort select {
+          width: 100%;
+          padding: 6px 10px;
+          font-size: 13px;
+          background: var(--bg-color);
+          color: var(--text-color);
+          border: 1px solid var(--border-color);
+          border-radius: 6px;
+          outline: none;
+          font-family: inherit;
+          cursor: pointer;
+          transition: border-color 0.2s var(--transition-timing),
+                      background 0.2s var(--transition-timing);
+      }
+
+      .sidebar-sort select:focus {
+          border-color: var(--link-color);
+      }
+
+      body.sidebar-collapsed .sidebar-sort {
           opacity: 0;
           pointer-events: none;
       }
@@ -1676,7 +1725,8 @@
         allItems.forEach((li) => {
           const link = li.querySelector(":scope > a");
           if (link) {
-            const text = link.textContent.toLowerCase();
+            const nameSpan = link.querySelector(".file-name");
+            const text = (nameSpan || link).textContent.toLowerCase();
             li.classList.toggle("search-hidden", !text.includes(query));
           }
         });
@@ -1714,6 +1764,100 @@
             }
           }
         });
+      }
+
+      // sidebar sort -- reorders tree items at each directory level
+      function initSidebarSort() {
+        var select = document.getElementById("sidebarSort");
+        if (!select) return;
+
+        var saved = localStorage.getItem("sidebar-sort") || "name-asc";
+        select.value = saved;
+        applySortMode(saved);
+
+        select.addEventListener("change", function () {
+          var mode = this.value;
+          localStorage.setItem("sidebar-sort", mode);
+          applySortMode(mode);
+        });
+      }
+
+      function applySortMode(mode) {
+        var tree = document.querySelector(".file-tree");
+        if (!tree) return;
+
+        var isNameSort = mode.startsWith("name");
+        tree.classList.toggle("sort-by-name", isNameSort);
+
+        if (!isNameSort) {
+          var field = mode.startsWith("modified") ? "modified" : "created";
+          tree.querySelectorAll(".file-ts").forEach(function (span) {
+            var el = span.closest("a");
+            if (!el) return;
+            var epoch = parseInt(el.getAttribute("data-" + field), 10);
+            span.textContent = epoch ? formatRelativeTime(epoch) : "";
+          });
+        }
+
+        sortTreeUl(tree, mode);
+      }
+
+      function sortTreeUl(ul, mode) {
+        var lis = Array.from(ul.children).filter(function (el) {
+          return el.tagName === "LI";
+        });
+        if (lis.length === 0) return;
+
+        lis.forEach(function (li) {
+          var subUl = li.querySelector(":scope > details > ul");
+          if (subUl) sortTreeUl(subUl, mode);
+        });
+
+        var parts = mode.split("-");
+        var field = parts[0];
+        var dir = parts[1];
+
+        lis.sort(function (a, b) {
+          var av = getSortValue(a, field);
+          var bv = getSortValue(b, field);
+          if (field === "name") {
+            var cmp = av.localeCompare(bv, undefined, { sensitivity: "base" });
+            return dir === "desc" ? -cmp : cmp;
+          }
+          return dir === "desc" ? bv - av : av - bv;
+        });
+
+        lis.forEach(function (li) {
+          ul.appendChild(li);
+        });
+      }
+
+      function getSortValue(li, field) {
+        if (field === "name") {
+          var details = li.querySelector(":scope > details");
+          if (details) {
+            var summary = details.querySelector("summary");
+            return summary ? summary.textContent.trim().toLowerCase() : "";
+          }
+          var link = li.querySelector(":scope > a");
+          var nameSpan = link ? link.querySelector(".file-name") : null;
+          return nameSpan ? nameSpan.textContent.trim().toLowerCase() : (link ? link.textContent.trim().toLowerCase() : "");
+        }
+        var el = li.querySelector(":scope > a, :scope > details");
+        if (!el) return 0;
+        return parseInt(el.getAttribute("data-" + field), 10) || 0;
+      }
+
+      function formatRelativeTime(epoch) {
+        var now = Math.floor(Date.now() / 1000);
+        var diff = now - epoch;
+        if (diff < 60) return "now";
+        if (diff < 3600) return Math.floor(diff / 60) + "m";
+        if (diff < 86400) return Math.floor(diff / 3600) + "h";
+        if (diff < 604800) return Math.floor(diff / 86400) + "d";
+        var d = new Date(epoch * 1000);
+        var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        return months[d.getMonth()] + " " + d.getDate();
       }
 
       // copy button on fenced code blocks
@@ -2152,6 +2296,7 @@
         initSidebarResize();
         initTreeState();
         initSidebarSearch();
+        initSidebarSort();
         if (typeof hljs !== "undefined") {
           hljs.highlightAll();
         }
@@ -2281,20 +2426,30 @@
           spellcheck="false"
         />
       </div>
+      <div class="sidebar-sort">
+        <select id="sidebarSort">
+          <option value="name-asc">Name A-Z</option>
+          <option value="name-desc">Name Z-A</option>
+          <option value="modified-desc">Modified newest</option>
+          <option value="modified-asc">Modified oldest</option>
+          <option value="created-desc">Created newest</option>
+          <option value="created-asc">Created oldest</option>
+        </select>
+      </div>
       <div class="sidebar-content">
-        <ul class="file-tree">
+        <ul class="file-tree sort-by-name">
           {% for item in tree recursive %}
           <li>
             {% if item.is_dir %}
-            <details data-dir-path="{{ item.dir_path }}">
+            <details data-dir-path="{{ item.dir_path }}" data-modified="{{ item.modified }}" data-created="{{ item.created }}">
               <summary>{{ item.name }}</summary>
               <ul>
                 {{ loop(item.children) }}
               </ul>
             </details>
             {% else %}
-            <a href="/{{ item.path|safe }}"{% if item.path == current_file %} class="active"{% endif %}>
-              {{ item.name }}
+            <a href="/{{ item.path|safe }}" data-modified="{{ item.modified }}" data-created="{{ item.created }}"{% if item.path == current_file %} class="active"{% endif %}>
+              <span class="file-name">{{ item.name }}</span><span class="file-ts"></span>
             </a>
             {% endif %}
           </li>

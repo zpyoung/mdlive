@@ -89,8 +89,8 @@ pub(crate) async fn render_file(
     let has_history = state.mdlive_dir.is_some() && file_type == "markdown";
 
     let rendered = if state.show_navigation() {
-        let filenames = state.get_sorted_filenames();
-        let tree = build_file_tree(&filenames);
+        let file_infos = state.get_file_infos();
+        let tree = build_file_tree(&file_infos);
 
         match template.render(context! {
             content => content,
@@ -190,8 +190,8 @@ fn render_editor(
     let has_history = state.mdlive_dir.is_some() && !new_file_mode && file_type == "markdown";
 
     let rendered = if state.show_navigation() {
-        let filenames = state.get_sorted_filenames();
-        let tree = build_file_tree(&filenames);
+        let file_infos = state.get_file_infos();
+        let tree = build_file_tree(&file_infos);
 
         match template.render(context! {
             editor_mode => true,

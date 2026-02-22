@@ -30,7 +30,14 @@ pub enum ServerMessage {
 pub(crate) struct TrackedFile {
     pub(crate) path: PathBuf,
     pub(crate) last_modified: SystemTime,
+    pub(crate) created: SystemTime,
     pub(crate) html: String,
+}
+
+pub(crate) struct FileInfo {
+    pub(crate) name: String,
+    pub(crate) modified: u64,
+    pub(crate) created: u64,
 }
 
 pub(crate) struct MarkdownState {
@@ -53,6 +60,7 @@ impl MarkdownState {
         for file_path in file_paths {
             let metadata = fs::metadata(&file_path)?;
             let last_modified = metadata.modified()?;
+            let created = metadata.created().unwrap_or(last_modified);
             let content = fs::read_to_string(&file_path)?;
             let html = Self::render_file_to_html(&file_path, &content)?;
 
@@ -68,6 +76,7 @@ impl MarkdownState {
                 TrackedFile {
                     path: canonical,
                     last_modified,
+                    created,
                     html,
                 },
             );
@@ -97,6 +106,25 @@ impl MarkdownState {
         filenames
     }
 
+    pub(crate) fn get_file_infos(&self) -> Vec<FileInfo> {
+        fn to_epoch(t: SystemTime) -> u64 {
+            t.duration_since(SystemTime::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0)
+        }
+        let mut infos: Vec<FileInfo> = self
+            .tracked_files
+            .iter()
+            .map(|(name, tf)| FileInfo {
+                name: name.clone(),
+                modified: to_epoch(tf.last_modified),
+                created: to_epoch(tf.created),
+            })
+            .collect();
+        infos.sort_by(|a, b| a.name.cmp(&b.name));
+        infos
+    }
+
     pub(crate) fn refresh_file(&mut self, filename: &str) -> Result<()> {
         if let Some(tracked) = self.tracked_files.get_mut(filename) {
             let metadata = fs::metadata(&tracked.path)?;
@@ -124,13 +152,16 @@ impl MarkdownState {
         }
 
         let metadata = fs::metadata(&file_path)?;
+        let last_modified = metadata.modified()?;
+        let created = metadata.created().unwrap_or(last_modified);
         let content = fs::read_to_string(&file_path)?;
 
         self.tracked_files.insert(
             key,
             TrackedFile {
                 path: file_path.clone(),
-                last_modified: metadata.modified()?,
+                last_modified,
+                created,
                 html: Self::render_file_to_html(&file_path, &content)?,
             },
         );

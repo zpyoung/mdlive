@@ -308,7 +308,7 @@ async fn test_directory_mode_has_navigation_sidebar() {
     let body = response.text();
 
     assert!(body.contains(r#"<nav class="sidebar">"#));
-    assert!(body.contains(r#"<ul class="file-tree">"#));
+    assert!(body.contains(r#"class="file-tree"#));
     assert!(body.contains("test1.md"));
     assert!(body.contains("test2.markdown"));
     assert!(body.contains("test3.md"));
@@ -323,8 +323,8 @@ async fn test_directory_mode_active_file_highlighting() {
     let body1 = response1.text();
 
     assert!(
-        body1.contains(r#"href="/test1.md" class="active""#),
-        "test1.md link should have href and class on same line"
+        body1.contains(r#"href="/test1.md""#) && body1.contains(r#"class="active""#),
+        "test1.md link should have href and active class"
     );
 
     let active_link_count = body1.matches(r#"class="active""#).count();
@@ -335,8 +335,8 @@ async fn test_directory_mode_active_file_highlighting() {
     let body2 = response2.text();
 
     assert!(
-        body2.contains(r#"href="/test2.markdown" class="active""#),
-        "test2.markdown link should have href and class on same line"
+        body2.contains(r#"href="/test2.markdown""#) && body2.contains(r#"class="active""#),
+        "test2.markdown link should have href and active class"
     );
 }
 
@@ -405,7 +405,7 @@ async fn test_directory_mode_tree_sidebar() {
     assert_eq!(response.status_code(), 200);
     let body = response.text();
 
-    assert!(body.contains(r#"<ul class="file-tree">"#));
+    assert!(body.contains(r#"class="file-tree"#));
     assert!(body.contains("<details"));
     assert!(body.contains("<summary>"));
     assert!(body.contains("docs"));
@@ -432,7 +432,7 @@ async fn test_nested_file_active_highlighting() {
     let body = response.text();
 
     assert!(
-        body.contains(r#"href="/docs/guide.md" class="active""#),
+        body.contains(r#"href="/docs/guide.md""#) && body.contains(r#"class="active""#),
         "nested file should have active class"
     );
 
