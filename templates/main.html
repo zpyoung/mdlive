@@ -434,6 +434,10 @@
           padding: 12px 20px;
       }
 
+      #content.content-code pre {
+          overflow-x: auto;
+      }
+
       /* Sidebar Toggle Button */
       .sidebar-toggle {
           position: fixed;
@@ -1062,6 +1066,12 @@
 
       .editor-filename-input:focus {
           border-color: var(--link-color);
+      }
+
+      .file-modified-ts {
+          font-size: 12px;
+          color: var(--blockquote-color);
+          white-space: nowrap;
       }
 
       .editor-spacer {
@@ -1860,6 +1870,16 @@
         return months[d.getMonth()] + " " + d.getDate();
       }
 
+      function initFileModifiedTs() {
+        var el = document.querySelector('.file-modified-ts');
+        if (!el) return;
+        var epoch = parseInt(el.getAttribute('data-epoch'), 10);
+        if (!epoch) return;
+        var d = new Date(epoch * 1000);
+        el.textContent = formatRelativeTime(epoch);
+        el.title = d.toLocaleString();
+      }
+
       // copy button on fenced code blocks
       function initCopyButtons() {
         const copyIcon =
@@ -2303,6 +2323,7 @@
         initCopyButtons();
         initMermaid();
         initContextMenu();
+        initFileModifiedTs();
         if (typeof window._editorSetupLiveReload === "function") {
           window._editorSetupLiveReload();
         } else {
@@ -2596,6 +2617,9 @@
           </button>
         </span>
         <div class="editor-spacer"></div>
+        {% if file_modified %}
+        <span class="file-modified-ts" data-epoch="{{ file_modified }}"></span>
+        {% endif %}
         {% if file_type == "markdown" %}
         <button
           class="editor-btn editor-btn-toggle active"
@@ -2925,6 +2949,23 @@
                   var hp = document.getElementById('historyPanel');
                   if (hp && hp.classList.contains('show')) {
                       loadHistory();
+                  }
+
+                  // update sidebar timestamp for saved file
+                  var nowEpoch = Math.floor(Date.now() / 1000);
+                  var sidebarLink = document.querySelector('.file-tree a[href="/' + path + '"]');
+                  if (sidebarLink) {
+                      sidebarLink.setAttribute('data-modified', nowEpoch);
+                      var sortMode = localStorage.getItem('sidebar-sort') || 'name-asc';
+                      applySortMode(sortMode);
+                  }
+
+                  // update header timestamp
+                  var fmts = document.querySelector('.file-modified-ts');
+                  if (fmts) {
+                      fmts.setAttribute('data-epoch', nowEpoch);
+                      fmts.textContent = formatRelativeTime(nowEpoch);
+                      fmts.title = new Date(nowEpoch * 1000).toLocaleString();
                   }
 
                   // if new file, redirect to edit existing
@@ -3448,6 +3489,9 @@
         </span>
         {% endif %} {% endif %}
         <div class="editor-spacer"></div>
+        {% if file_modified %}
+        <span class="file-modified-ts" data-epoch="{{ file_modified }}"></span>
+        {% endif %}
         {% if has_history and current_file %}
         <button class="editor-btn" onclick="toggleHistory()">Revisions</button>
         {% endif %}

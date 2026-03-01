@@ -7,6 +7,7 @@ use minijinja::context;
 use minijinja::value::Value;
 use serde::Deserialize;
 use std::fs;
+use std::time::UNIX_EPOCH;
 
 use crate::state::{MarkdownState, SharedMarkdownState};
 use crate::template::{template_env, TEMPLATE_NAME};
@@ -78,13 +79,19 @@ pub(crate) async fn render_file(
 
     let file_type = file_type_class(current_file);
 
-    let (content, has_mermaid) = if let Some(tracked) = state.tracked_files.get(current_file) {
-        let html = &tracked.html;
-        let mermaid = file_type == "markdown" && html.contains(r#"class="language-mermaid""#);
-        (Value::from_safe_string(html.clone()), mermaid)
-    } else {
-        return (StatusCode::NOT_FOUND, Html("File not found".to_string()));
-    };
+    let (content, has_mermaid, file_modified) =
+        if let Some(tracked) = state.tracked_files.get(current_file) {
+            let html = &tracked.html;
+            let mermaid = file_type == "markdown" && html.contains(r#"class="language-mermaid""#);
+            let modified = tracked
+                .last_modified
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            (Value::from_safe_string(html.clone()), mermaid, modified)
+        } else {
+            return (StatusCode::NOT_FOUND, Html("File not found".to_string()));
+        };
 
     let has_history = state.mdlive_dir.is_some() && file_type == "markdown";
 
@@ -95,6 +102,7 @@ pub(crate) async fn render_file(
         match template.render(context! {
             content => content,
             file_type => file_type,
+            file_modified => file_modified,
             mermaid_enabled => has_mermaid,
             show_navigation => true,
             has_history => has_history,
@@ -113,6 +121,7 @@ pub(crate) async fn render_file(
         match template.render(context! {
             content => content,
             file_type => file_type,
+            file_modified => file_modified,
             mermaid_enabled => has_mermaid,
             show_navigation => false,
             has_history => has_history,
@@ -188,6 +197,16 @@ fn render_editor(
 
     let file_type = file_type_class(current_file);
     let has_history = state.mdlive_dir.is_some() && !new_file_mode && file_type == "markdown";
+    let file_modified = if !new_file_mode {
+        state
+            .tracked_files
+            .get(current_file)
+            .and_then(|tf| tf.last_modified.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0)
+    } else {
+        0
+    };
 
     let rendered = if state.show_navigation() {
         let file_infos = state.get_file_infos();
@@ -197,6 +216,7 @@ fn render_editor(
             editor_mode => true,
             new_file_mode => new_file_mode,
             file_type => file_type,
+            file_modified => file_modified,
             raw_content => raw_content,
             current_file => current_file,
             has_history => has_history,
@@ -216,6 +236,7 @@ fn render_editor(
             editor_mode => true,
             new_file_mode => new_file_mode,
             file_type => file_type,
+            file_modified => file_modified,
             raw_content => raw_content,
             current_file => current_file,
             has_history => has_history,
