@@ -470,6 +470,111 @@
           left: 4px;
           cursor: e-resize;
       }
+
+      /* Tab Bar */
+      .tab-bar {
+          position: fixed;
+          top: 0;
+          left: var(--sidebar-width);
+          right: 0;
+          height: 36px;
+          display: flex;
+          flex-direction: row;
+          align-items: stretch;
+          overflow-x: auto;
+          overflow-y: hidden;
+          background: var(--code-bg);
+          border-bottom: 1px solid var(--border-color);
+          z-index: 10;
+          transition: left var(--transition-speed) var(--transition-timing),
+                      background var(--transition-speed) var(--transition-timing);
+          scrollbar-width: none;
+      }
+
+      .tab-bar::-webkit-scrollbar { display: none; }
+
+      body.sidebar-collapsed .tab-bar {
+          left: var(--sidebar-collapsed-width);
+      }
+
+      body.sidebar-resizing .tab-bar {
+          transition: none;
+      }
+
+      .tab {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 0 12px;
+          height: 100%;
+          cursor: pointer;
+          border-right: 1px solid var(--border-color);
+          white-space: nowrap;
+          font-size: 13px;
+          color: var(--text-color);
+          background: transparent;
+          user-select: none;
+          flex-shrink: 0;
+          transition: background 0.15s ease;
+      }
+
+      .tab:hover {
+          background: var(--border-color-light);
+      }
+
+      .tab.active {
+          background: var(--bg-color);
+          font-weight: 600;
+          border-bottom: 2px solid var(--link-color);
+      }
+
+      .tab-dirty {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--link-color);
+          display: none;
+          flex-shrink: 0;
+      }
+
+      .tab.dirty .tab-dirty {
+          display: inline-block;
+      }
+
+      .tab-name {
+          max-width: 160px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+      }
+
+      .tab-close {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 16px;
+          height: 16px;
+          border: none;
+          background: none;
+          color: var(--text-color);
+          opacity: 0.4;
+          cursor: pointer;
+          padding: 0;
+          font-size: 14px;
+          line-height: 1;
+          border-radius: 3px;
+          flex-shrink: 0;
+      }
+
+      .tab-close:hover {
+          opacity: 1;
+          background: var(--border-color-light);
+      }
+
+      .has-tabs .page-container,
+      .has-tabs .editor-container {
+          padding-top: 36px;
+      }
+
       {% else %}
       /* Single-file layout */
       html, body {
@@ -2162,8 +2267,25 @@
                   alert("Delete failed: " + (data.error || "unknown error"));
                   return;
                 }
+                TabManager.clearDraft(path);
                 if (path === currentFile) {
-                  window.location.href = "/";
+                  var tabs = TabManager.tabs();
+                  var tabIdx = -1;
+                  for (var i = 0; i < tabs.length; i++) {
+                      if (tabs[i].path === path) { tabIdx = i; break; }
+                  }
+                  if (tabIdx !== -1) {
+                      tabs.splice(tabIdx, 1);
+                      TabManager.save();
+                      if (tabs.length > 0) {
+                          var nextIdx = Math.min(tabIdx, tabs.length - 1);
+                          window.location.href = '/' + tabs[nextIdx].path;
+                      } else {
+                          window.location.href = "/";
+                      }
+                  } else {
+                      window.location.href = "/";
+                  }
                 }
               })
               .catch(function (err) {
@@ -2195,6 +2317,7 @@
                   return;
                 }
                 closeFileDialog();
+                TabManager.updatePath(path, data.path);
                 if (path === currentFile) {
                   window.location.href = "/" + data.path;
                 }
@@ -2324,6 +2447,25 @@
         initMermaid();
         initContextMenu();
         initFileModifiedTs();
+
+        // sidebar link interception for tab management (view mode only)
+        if (showNavigation && !isEditorMode) {
+            document.querySelectorAll('.file-tree a').forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    var href = link.getAttribute('href');
+                    if (!href || href === '#') return;
+                    var path = href.replace(/^\//, '');
+                    if (!path) return;
+                    e.preventDefault();
+                    if (!TabManager.addTab(path, 'view')) {
+                        showAlert('Tab limit reached', 'Close a tab to open more files.');
+                        return;
+                    }
+                    TabManager.switchTo(path);
+                });
+            });
+        }
+
         if (typeof window._editorSetupLiveReload === "function") {
           window._editorSetupLiveReload();
         } else {
@@ -2478,9 +2620,257 @@
         </ul>
       </div>
     </nav>
+    <div class="tab-bar" id="tabBar"></div>
     {% endif %}
     <script>
       var currentFile = {{ current_file|default('')|tojson }};
+      var isEditorMode = {{ editor_mode|default(false)|tojson }};
+      var showNavigation = {{ show_navigation|default(false)|tojson }};
+    </script>
+    <script>
+    var TabManager = (function() {
+        var MAX_TABS = 10;
+        var STORAGE_KEY = 'mdlive-tabs';
+        var DRAFT_PREFIX = 'tab-draft:';
+        var tabs = [];
+        var currentPath = currentFile;
+        var tabBar = null;
+
+        function load() {
+            try {
+                var stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) tabs = JSON.parse(stored);
+                if (!Array.isArray(tabs)) tabs = [];
+            } catch(e) { tabs = []; }
+        }
+
+        function save() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(tabs));
+        }
+
+        function findTab(path) {
+            for (var i = 0; i < tabs.length; i++) {
+                if (tabs[i].path === path) return i;
+            }
+            return -1;
+        }
+
+        function getDisplayName(path) {
+            var parts = path.split('/');
+            var name = parts[parts.length - 1];
+            // check for ambiguous filenames
+            var count = 0;
+            for (var i = 0; i < tabs.length; i++) {
+                var tParts = tabs[i].path.split('/');
+                if (tParts[tParts.length - 1] === name) count++;
+            }
+            if (count > 1 && parts.length > 1) {
+                return parts[parts.length - 2] + '/' + name;
+            }
+            return name;
+        }
+
+        function isDirty(path) {
+            return sessionStorage.getItem(DRAFT_PREFIX + path) !== null;
+        }
+
+        function cacheDraft(path, content) {
+            sessionStorage.setItem(DRAFT_PREFIX + path, content);
+        }
+
+        function clearDraft(path) {
+            sessionStorage.removeItem(DRAFT_PREFIX + path);
+        }
+
+        function getDraft(path) {
+            return sessionStorage.getItem(DRAFT_PREFIX + path);
+        }
+
+        function render() {
+            if (!tabBar) return;
+            tabBar.innerHTML = '';
+            for (var i = 0; i < tabs.length; i++) {
+                (function(tab) {
+                    var div = document.createElement('div');
+                    div.className = 'tab';
+                    if (tab.path === currentPath) div.className += ' active';
+                    if (isDirty(tab.path)) div.className += ' dirty';
+                    div.setAttribute('data-path', tab.path);
+                    div.title = tab.path;
+
+                    var dot = document.createElement('span');
+                    dot.className = 'tab-dirty';
+                    div.appendChild(dot);
+
+                    var nameSpan = document.createElement('span');
+                    nameSpan.className = 'tab-name';
+                    nameSpan.textContent = getDisplayName(tab.path);
+                    div.appendChild(nameSpan);
+
+                    var closeBtn = document.createElement('button');
+                    closeBtn.className = 'tab-close';
+                    closeBtn.title = 'Close tab';
+                    closeBtn.innerHTML = '&times;';
+                    closeBtn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        removeTab(tab.path);
+                    });
+                    div.appendChild(closeBtn);
+
+                    div.addEventListener('click', function() {
+                        switchTo(tab.path);
+                    });
+
+                    tabBar.appendChild(div);
+                })(tabs[i]);
+            }
+        }
+
+        function addTab(path, mode) {
+            if (!path) return false;
+            var idx = findTab(path);
+            if (idx !== -1) {
+                tabs[idx].mode = mode || tabs[idx].mode;
+                save();
+                render();
+                return true;
+            }
+            if (tabs.length >= MAX_TABS) return false;
+            tabs.push({ path: path, mode: mode || 'view' });
+            save();
+            render();
+            return true;
+        }
+
+        function removeTab(path) {
+            var idx = findTab(path);
+            if (idx === -1) return;
+
+            if (path === currentPath && isDirty(path)) {
+                showConfirm('This tab has unsaved changes. Close anyway?', function() {
+                    clearDraft(path);
+                    doRemoveTab(path, idx);
+                });
+                return;
+            }
+
+            clearDraft(path);
+            doRemoveTab(path, idx);
+        }
+
+        function doRemoveTab(path, idx) {
+            tabs.splice(idx, 1);
+            save();
+
+            if (path === currentPath) {
+                if (tabs.length === 0) {
+                    window.location.href = '/';
+                    return;
+                }
+                var nextIdx = Math.min(idx, tabs.length - 1);
+                switchTo(tabs[nextIdx].path);
+                return;
+            }
+            render();
+        }
+
+        function switchTo(path) {
+            if (path === currentPath) return;
+
+            // cache draft if current tab is in editor and dirty
+            if (typeof window._tabGetEditorContent === 'function') {
+                var content = window._tabGetEditorContent();
+                if (content !== null) {
+                    cacheDraft(currentPath, content);
+                }
+            }
+
+            var tab = tabs[findTab(path)];
+            if (!tab) return;
+
+            var url = tab.mode === 'edit' ? '/edit/' + path : '/' + path;
+            window.location.href = url;
+        }
+
+        function updateMode(path, mode) {
+            var idx = findTab(path);
+            if (idx !== -1) {
+                tabs[idx].mode = mode;
+                save();
+            }
+        }
+
+        function updatePath(oldPath, newPath) {
+            var idx = findTab(oldPath);
+            if (idx !== -1) {
+                tabs[idx].path = newPath;
+                // transfer draft
+                var draft = getDraft(oldPath);
+                if (draft !== null) {
+                    clearDraft(oldPath);
+                    cacheDraft(newPath, draft);
+                }
+                save();
+                render();
+            }
+        }
+
+        function init() {
+            if (!showNavigation) return;
+            tabBar = document.getElementById('tabBar');
+            if (!tabBar) return;
+
+            load();
+
+            // clean tabs for paths that may have been removed server-side
+            // (we don't proactively remove -- server 404 handles it)
+
+            // ensure current file is in tabs
+            if (currentPath) {
+                var mode = isEditorMode ? 'edit' : 'view';
+                var idx = findTab(currentPath);
+                if (idx === -1) {
+                    if (tabs.length >= MAX_TABS) {
+                        // make room by removing the last non-active tab
+                        for (var i = tabs.length - 1; i >= 0; i--) {
+                            if (tabs[i].path !== currentPath) {
+                                tabs.splice(i, 1);
+                                break;
+                            }
+                        }
+                    }
+                    tabs.push({ path: currentPath, mode: mode });
+                } else {
+                    tabs[idx].mode = mode;
+                }
+                save();
+            }
+
+            document.body.classList.add('has-tabs');
+            render();
+        }
+
+        return {
+            init: init,
+            addTab: addTab,
+            removeTab: removeTab,
+            switchTo: switchTo,
+            updateMode: updateMode,
+            updatePath: updatePath,
+            cacheDraft: cacheDraft,
+            clearDraft: clearDraft,
+            getDraft: getDraft,
+            isDirty: isDirty,
+            render: render,
+            save: save,
+            tabs: function() { return tabs; },
+            MAX_TABS: MAX_TABS
+        };
+    })();
+
+    document.addEventListener('DOMContentLoaded', function() {
+        TabManager.init();
+    });
     </script>
     <div id="contextMenu" class="context-menu"></div>
     <div id="fileDialog" class="file-dialog-overlay">
@@ -2666,6 +3056,14 @@
           <textarea id="editorTextarea" spellcheck="false">
 {{ raw_content }}</textarea
           >
+          <script>
+          (function() {
+              var draft = sessionStorage.getItem('tab-draft:' + {{ current_file|tojson }});
+              if (draft !== null) {
+                  document.getElementById('editorTextarea').value = draft;
+              }
+          })();
+          </script>
         </div>
         {% if file_type == "markdown" %}
         <div class="editor-pane-resize-handle" id="editorResizeHandle"></div>
@@ -2708,6 +3106,18 @@
           var editorHeader = document.querySelector('.editor-header');
           var originalTitle = document.title;
 
+          // detect restored draft from tab switch
+          var restoredDraft = sessionStorage.getItem('tab-draft:' + filePath);
+          if (restoredDraft !== null) {
+              hasUnsavedChanges = true;
+          }
+
+          // expose editor content for tab draft caching
+          window._tabGetEditorContent = function() {
+              if (hasUnsavedChanges) return textarea.value;
+              return null;
+          };
+
           function updateUnsavedIndicator() {
               if (hasUnsavedChanges) {
                   editorHeader.classList.add('unsaved');
@@ -2724,20 +3134,36 @@
           var _revisionRequestCounter = 0;
 
           window.addEventListener('beforeunload', function(e) {
+              // cache draft so it survives accidental close + reopen
               if (hasUnsavedChanges) {
+                  TabManager.cacheDraft(filePath, textarea.value);
                   e.preventDefault();
               }
           });
 
           document.querySelectorAll('.file-tree a').forEach(function(link) {
               link.addEventListener('click', function(e) {
+                  e.preventDefault();
+                  var href = link.getAttribute('href');
+                  var path = href.replace(/^\//, '');
+                  if (!path) return;
+
+                  var doNavigate = function() {
+                      if (!TabManager.addTab(path, 'view')) {
+                          showAlert('Tab limit reached', 'Close a tab to open more files.');
+                          return;
+                      }
+                      TabManager.switchTo(path);
+                  };
+
                   if (hasUnsavedChanges) {
-                      e.preventDefault();
-                      var href = link.getAttribute('href');
                       showConfirm('You have unsaved changes. Leave this page?', function() {
+                          TabManager.cacheDraft(filePath, textarea.value);
                           hasUnsavedChanges = false;
-                          window.location.href = href;
+                          doNavigate();
                       });
+                  } else {
+                      doNavigate();
                   }
               });
           });
@@ -2773,6 +3199,7 @@
           // initial render
           updateLineNumbers();
           updatePreview();
+          if (hasUnsavedChanges) updateUnsavedIndicator();
 
           // live preview with debounce
           textarea.addEventListener('input', function() {
@@ -2935,6 +3362,8 @@
                   }
                   hasUnsavedChanges = false;
                   updateUnsavedIndicator();
+                  TabManager.clearDraft(filePath);
+                  TabManager.render();
                   var badge = document.getElementById('revisionBadge');
                   if (badge) { badge.classList.remove('show'); badge.textContent = ''; }
                   saveBtn.textContent = 'Saved';
@@ -2985,10 +3414,12 @@
               if (hasUnsavedChanges) {
                   showConfirm('Discard unsaved changes?', function() {
                       hasUnsavedChanges = false;
+                      TabManager.clearDraft(filePath);
                       editorCancel();
                   });
                   return;
               }
+              TabManager.updateMode(filePath, 'view');
               if (isNewFile || !filePath) {
                   window.location.href = '/';
               } else {
@@ -3013,6 +3444,7 @@
                           }
                           closeFileDialog();
                           hasUnsavedChanges = false;
+                          TabManager.updatePath(filePath, data.path);
                           window.location.href = '/edit/' + data.path;
                       })
                       .catch(function(err) {
@@ -3046,7 +3478,28 @@
                           return;
                       }
                       hasUnsavedChanges = false;
-                      window.location.href = '/';
+                      TabManager.clearDraft(filePath);
+                      // remove tab and let TabManager handle navigation
+                      var tabs = TabManager.tabs();
+                      var tabIdx = -1;
+                      for (var i = 0; i < tabs.length; i++) {
+                          if (tabs[i].path === filePath) { tabIdx = i; break; }
+                      }
+                      if (tabIdx !== -1) {
+                          tabs.splice(tabIdx, 1);
+                          TabManager.save();
+                          if (tabs.length > 0) {
+                              var nextIdx = Math.min(tabIdx, tabs.length - 1);
+                              var nextUrl = tabs[nextIdx].mode === 'edit'
+                                  ? '/edit/' + tabs[nextIdx].path
+                                  : '/' + tabs[nextIdx].path;
+                              window.location.href = nextUrl;
+                          } else {
+                              window.location.href = '/';
+                          }
+                      } else {
+                          window.location.href = '/';
+                      }
                   })
                   .catch(function(err) {
                       alert('Delete failed: ' + err.message);
@@ -3943,6 +4396,10 @@
             <td>Toggle revisions</td>
           </tr>
           <tr>
+            <td><span class="shortcuts-key">w</span></td>
+            <td>Close tab</td>
+          </tr>
+          <tr>
             <td><span class="shortcuts-key">Esc</span></td>
             <td>Close / cancel</td>
           </tr>
@@ -4021,6 +4478,11 @@
                       e.preventDefault();
                       var searchInput = document.getElementById('sidebarSearch');
                       if (searchInput) searchInput.focus();
+                  }
+                  break;
+              case 'w':
+                  if (showNavigation && currentFile) {
+                      TabManager.removeTab(currentFile);
                   }
                   break;
           }
