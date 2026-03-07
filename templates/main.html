@@ -973,6 +973,135 @@
           text-align: center;
       }
 
+      .about-toggle {
+          position: fixed;
+          bottom: 20px;
+          right: 120px;
+          background: var(--code-bg);
+          border: 1px solid var(--border-color-light);
+          border-radius: 6px;
+          padding: 8px 12px;
+          cursor: pointer;
+          font-size: 14px;
+          color: var(--text-color);
+          transition: background 0.2s var(--transition-timing),
+                      border-color var(--transition-speed) var(--transition-timing);
+          z-index: 100;
+      }
+
+      .about-toggle:hover,
+      .about-toggle:focus-visible {
+          background: var(--border-color-light);
+          outline: none;
+      }
+
+      .about-modal {
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.5);
+          z-index: 1000;
+          backdrop-filter: blur(4px);
+      }
+
+      .about-modal.show {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+      }
+
+      .about-modal-content {
+          background: var(--bg-color);
+          border: 1px solid var(--border-color);
+          border-radius: 12px;
+          padding: 24px 32px;
+          max-width: 380px;
+          width: 90%;
+          text-align: center;
+      }
+
+      .about-logo {
+          width: 64px;
+          height: 64px;
+          margin-bottom: 12px;
+      }
+
+      .about-company {
+          font-size: 14px;
+          color: var(--blockquote-color);
+          margin: 0 0 8px 0;
+      }
+
+      .about-github {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          color: var(--link-color);
+          text-decoration: none;
+          font-size: 13px;
+          margin-bottom: 16px;
+      }
+
+      .about-github:hover {
+          text-decoration: underline;
+      }
+
+      .about-github svg {
+          flex-shrink: 0;
+      }
+
+      .about-divider {
+          border: none;
+          border-top: 1px solid var(--border-color-light);
+          margin: 0 0 16px 0;
+      }
+
+      .about-attribution {
+          font-size: 13px;
+          color: var(--blockquote-color);
+          margin: 0 0 16px 0;
+          font-style: italic;
+      }
+
+      .about-libs {
+          text-align: left;
+          margin: 0;
+          padding: 0;
+          list-style: none;
+      }
+
+      .about-libs-heading {
+          font-size: 12px;
+          color: var(--blockquote-color);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 8px;
+          text-align: left;
+      }
+
+      .about-libs li {
+          display: flex;
+          justify-content: space-between;
+          padding: 4px 0;
+          font-size: 13px;
+          color: var(--text-color);
+          border-top: 1px solid var(--border-color-light);
+      }
+
+      .about-libs li span:last-child {
+          color: var(--blockquote-color);
+          font-size: 12px;
+      }
+
+      .about-license {
+          font-size: 12px;
+          color: var(--blockquote-color);
+          margin: 16px 0 0 0;
+      }
+
       /* Theme-specific card styles */
       .theme-card[data-theme="light"] {
           background: #fff;
@@ -2922,6 +3051,11 @@
     </div>
 
     <button
+      class="about-toggle"
+      onclick="openAboutModal()"
+      title="About (?)"
+    >?</button>
+    <button
       class="shortcuts-toggle"
       onclick="openShortcutsModal()"
       title="Keyboard shortcuts (/)"
@@ -4400,10 +4534,36 @@
             <td>Close tab</td>
           </tr>
           <tr>
+            <td><span class="shortcuts-key">?</span></td>
+            <td>About / attribution</td>
+          </tr>
+          <tr>
             <td><span class="shortcuts-key">Esc</span></td>
             <td>Close / cancel</td>
           </tr>
         </table>
+      </div>
+    </div>
+
+    <div class="about-modal" id="aboutModal">
+      <div class="about-modal-content">
+        <img src="/static/mdlive.png" alt="mdlive" class="about-logo" />
+        <p class="about-company">Bearded Giant, LLC</p>
+        <a class="about-github" href="https://github.com/bearded-giant/mdlive" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          github.com/bearded-giant/mdlive
+        </a>
+        <hr class="about-divider" />
+        <p class="about-attribution">Originally based on mdserve by Jose Fernandez</p>
+        <div class="about-libs-heading">Built with</div>
+        <ul class="about-libs">
+          <li><span>axum</span><span>Web framework</span></li>
+          <li><span>minijinja</span><span>Templating</span></li>
+          <li><span>highlight.js</span><span>Syntax highlighting</span></li>
+          <li><span>Mermaid</span><span>Diagrams</span></li>
+          <li><span>marked</span><span>Markdown preview</span></li>
+        </ul>
+        <p class="about-license">MIT License</p>
       </div>
     </div>
 
@@ -4413,6 +4573,12 @@
       }
       function closeShortcutsModal() {
           document.getElementById('shortcutsModal').classList.remove('show');
+      }
+      function openAboutModal() {
+          document.getElementById('aboutModal').classList.add('show');
+      }
+      function closeAboutModal() {
+          document.getElementById('aboutModal').classList.remove('show');
       }
 
       document.addEventListener('keydown', function(e) {
@@ -4432,6 +4598,12 @@
           // when shortcuts modal is open, only escape closes it
           if (shortcutsModal && shortcutsModal.classList.contains('show')) {
               if (e.key === 'Escape') closeShortcutsModal();
+              return;
+          }
+
+          var aboutModal = document.getElementById('aboutModal');
+          if (aboutModal && aboutModal.classList.contains('show')) {
+              if (e.key === 'Escape') closeAboutModal();
               return;
           }
 
@@ -4485,12 +4657,21 @@
                       TabManager.removeTab(currentFile);
                   }
                   break;
+              case '?':
+                  e.preventDefault();
+                  openAboutModal();
+                  break;
           }
       });
 
       // close shortcuts modal on click outside
       document.getElementById('shortcutsModal').addEventListener('click', function(e) {
           if (e.target === this) closeShortcutsModal();
+      });
+
+      // close about modal on click outside
+      document.getElementById('aboutModal').addEventListener('click', function(e) {
+          if (e.target === this) closeAboutModal();
       });
     </script>
   </body>

@@ -58,7 +58,7 @@ This is particularly useful for reviewing agent-generated plans, design docs, an
 
 ### Viewing
 
-GFM rendering with tables, task lists, strikethrough, and fenced code blocks. Syntax highlighting via highlight.js. Mermaid diagram rendering. YAML and TOML frontmatter is stripped before rendering. Images referenced in markdown are served inline (png, jpg, gif, svg, webp).
+GFM rendering with tables, task lists, strikethrough, and fenced code blocks. Syntax highlighting via highlight.js. Mermaid diagram rendering. YAML and TOML frontmatter is stripped before rendering. Images referenced in markdown are served inline (png, jpg, gif, svg, webp). Plain text and JSON files are also viewable and editable with syntax highlighting.
 
 ### Themes
 
@@ -82,7 +82,7 @@ Every save creates a timestamped snapshot in a `.mdlive/` directory next to your
 
 ### Directory mode
 
-Pass a directory and mdlive recursively finds all `.md` and `.markdown` files, builds a collapsible tree sidebar. Right-click folders to create files in specific subdirectories. The sidebar is resizable (drag the edge) and collapsible (`k` shortcut or the toggle button). Search the tree by pressing `s`.
+Pass a directory and mdlive recursively finds all `.md`, `.markdown`, `.txt`, and `.json` files, builds a collapsible tree sidebar with document tabs for quick switching between open files. Right-click folders to create files in specific subdirectories. The sidebar is resizable (drag the edge) and collapsible (`k` shortcut or the toggle button). Search the tree by pressing `s`.
 
 ### Keyboard shortcuts
 
@@ -99,6 +99,8 @@ Press `/` to see all available shortcuts. Shortcuts are suppressed when typing i
 | `s` | Focus search |
 | `Ctrl+S` | Save |
 | `h` / `r` | Toggle revisions |
+| `w` | Close tab |
+| `?` | About / attribution |
 | `Esc` | Close / cancel |
 
 ## Usage
