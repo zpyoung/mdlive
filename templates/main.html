@@ -2755,12 +2755,13 @@
       var currentFile = {{ current_file|default('')|tojson }};
       var isEditorMode = {{ editor_mode|default(false)|tojson }};
       var showNavigation = {{ show_navigation|default(false)|tojson }};
+      var baseDir = {{ base_dir|default('')|tojson }};
     </script>
     <script>
     var TabManager = (function() {
         var MAX_TABS = 10;
-        var STORAGE_KEY = 'mdlive-tabs';
-        var DRAFT_PREFIX = 'tab-draft:';
+        var STORAGE_KEY = 'mdlive-tabs:' + baseDir;
+        var DRAFT_PREFIX = 'tab-draft:' + baseDir + ':';
         var tabs = [];
         var currentPath = currentFile;
         var tabBar = null;

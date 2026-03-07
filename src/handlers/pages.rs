@@ -108,6 +108,7 @@ pub(crate) async fn render_file(
             has_history => has_history,
             tree => tree,
             current_file => current_file,
+            base_dir => state.base_dir.display().to_string(),
         }) {
             Ok(r) => r,
             Err(e) => {
@@ -126,6 +127,7 @@ pub(crate) async fn render_file(
             show_navigation => false,
             has_history => has_history,
             current_file => current_file,
+            base_dir => state.base_dir.display().to_string(),
         }) {
             Ok(r) => r,
             Err(e) => {
@@ -222,6 +224,7 @@ fn render_editor(
             has_history => has_history,
             show_navigation => true,
             tree => tree,
+            base_dir => state.base_dir.display().to_string(),
         }) {
             Ok(r) => r,
             Err(e) => {
@@ -241,6 +244,7 @@ fn render_editor(
             current_file => current_file,
             has_history => has_history,
             show_navigation => false,
+            base_dir => state.base_dir.display().to_string(),
         }) {
             Ok(r) => r,
             Err(e) => {
