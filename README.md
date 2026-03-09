@@ -2,11 +2,11 @@
 
 # mdlive
 
-A lightweight markdown editor and live preview server. Point it at a file or directory, get instant rendered output in the browser with live reload. Edit, create, rename, delete -- all from the browser. No config, no setup.
+A lightweight markdown editor and live preview server. Point it at a file or directory, get instant rendered output in the browser with live reload. Edit, create, rename, delete -- all from the browser. Run it as a persistent daemon and switch between projects without spawning new processes.
 
 I built this to sit next to AI coding agents. When an agent writes markdown -- plans, architecture docs, research -- I'd rather read it rendered than squint at raw text in a terminal. But it works just as well as a standalone markdown workspace.
 
-This started as a fork of Jose Fernandez's [mdserve](https://github.com/jfernandez/mdserve). The original idea and core implementation are his. I've since taken it in a different direction: in-browser editing, file CRUD, version history, keyboard shortcuts, theming. Different enough to warrant its own repo.
+This started as a fork of Jose Fernandez's [mdserve](https://github.com/jfernandez/mdserve). The original idea and initial core implementation are his. I've since taken it in a different direction: in-browser editing, file CRUD, version history, workspace switching, keyboard shortcuts, theming. Different enough to warrant its own repo.
 
 https://github.com/bearded-giant/mdlive/raw/main/docs/images/mdlive.mp4
 
@@ -34,6 +34,7 @@ mdlive is available as a [Claude Code](https://docs.anthropic.com/en/docs/claude
 ```bash
 mdlive README.md         # single file, opens browser
 mdlive docs/             # directory mode with sidebar
+mdlive                   # daemon mode -- workspace picker in the browser
 ```
 
 #### Single file view
@@ -84,6 +85,28 @@ Every save creates a timestamped snapshot in a `.mdlive/` directory next to your
 
 Pass a directory and mdlive recursively finds all `.md`, `.markdown`, `.txt`, and `.json` files, builds a collapsible tree sidebar with document tabs for quick switching between open files. Right-click folders to create files in specific subdirectories. The sidebar is resizable (drag the edge) and collapsible (`k` shortcut or the toggle button). Search the tree by pressing `s`.
 
+### Daemon mode
+
+Run `mdlive` with no arguments and it starts in daemon mode -- a single long-running process you keep around. Instead of spawning a new process per directory, you switch between projects from the browser.
+
+On first launch you get a workspace picker: type a path (directories and individual files both work, `~` expansion included) or click a recent entry. Once a workspace is loaded, everything works the same as direct mode -- sidebar, tabs, editing, revisions. Hit `o` or click the folder icon in the bottom-right to switch to a different workspace without restarting.
+
+The recent workspaces list (up to 15 entries, FIFO) is stored at `~/.config/mdlive/config.toml`. This is the only file mdlive writes outside of the directories you open.
+
+#### Auto-start on login (macOS)
+
+mdlive can install itself as a LaunchAgent so it starts automatically when you log in and stays running in the background.
+
+```bash
+mdlive service install              # install and start (port 3000)
+mdlive service install -p 3030      # use a specific port
+mdlive service stop                 # stop the daemon
+mdlive service status               # check if it's running
+mdlive service uninstall            # stop and remove
+```
+
+The plist lives at `~/Library/LaunchAgents/com.beardedgiant.mdlive.plist`. Uninstalling removes it cleanly -- no system-level changes, nothing left behind.
+
 ### Keyboard shortcuts
 
 Press `/` to see all available shortcuts. Shortcuts are suppressed when typing in inputs, when modifier keys are held, and when dialogs are open.
@@ -100,17 +123,23 @@ Press `/` to see all available shortcuts. Shortcuts are suppressed when typing i
 | `Ctrl+S` | Save |
 | `h` / `r` | Toggle revisions |
 | `w` | Close tab |
+| `o` | Open workspace (daemon mode) |
 | `?` | About / attribution |
 | `Esc` | Close / cancel |
 
 ## Usage
 
 ```bash
+mdlive                        # daemon mode with workspace picker
 mdlive file.md                # serve a single file (port 3000)
 mdlive docs/                  # directory mode with sidebar
 mdlive docs/ -p 8080          # custom port
 mdlive file.md --no-open      # don't auto-open the browser
 mdlive file.md -H 0.0.0.0    # bind to all interfaces
+mdlive service install        # auto-start on login (macOS)
+mdlive service stop           # stop the daemon
+mdlive service uninstall      # remove auto-start
+mdlive service status         # check daemon status
 ```
 
 ## Development
@@ -119,7 +148,7 @@ Rust 1.82+, 2021 edition. Templates and static assets are embedded at compile ti
 
 ```bash
 cargo build --release
-cargo test                        # all tests (74 unit + integration)
+cargo test                        # all tests (99 unit + integration)
 cargo test --test pages_test      # specific test file
 cargo test test_server_starts     # by name
 ```

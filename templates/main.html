@@ -1024,8 +1024,7 @@
       }
 
       .about-logo {
-          width: 64px;
-          height: 64px;
+          width: 180px;
           margin-bottom: 12px;
       }
 
@@ -1100,6 +1099,154 @@
           font-size: 12px;
           color: var(--blockquote-color);
           margin: 16px 0 0 0;
+      }
+
+      .workspace-toggle {
+          position: fixed;
+          bottom: 20px;
+          right: 170px;
+          background: var(--code-bg);
+          border: 1px solid var(--border-color-light);
+          border-radius: 6px;
+          padding: 8px 12px;
+          cursor: pointer;
+          font-size: 14px;
+          color: var(--text-color);
+          transition: background 0.2s var(--transition-timing),
+                      border-color var(--transition-speed) var(--transition-timing);
+          z-index: 100;
+      }
+
+      .workspace-toggle:hover,
+      .workspace-toggle:focus-visible {
+          background: var(--border-color-light);
+          outline: none;
+      }
+
+      .workspace-modal {
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.5);
+          z-index: 1000;
+          backdrop-filter: blur(4px);
+      }
+
+      .workspace-modal.show {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+      }
+
+      .workspace-modal-content {
+          background: var(--bg-color);
+          border: 1px solid var(--border-color);
+          border-radius: 12px;
+          padding: 24px 32px;
+          max-width: 680px;
+          width: 90%;
+      }
+
+      .workspace-modal h3 {
+          margin: 0 0 16px 0;
+          color: var(--text-color);
+          font-size: 18px;
+          text-align: center;
+      }
+
+      .workspace-path-input {
+          width: 100%;
+          padding: 10px 14px;
+          font-size: 15px;
+          font-family: var(--code-font);
+          background: var(--code-bg);
+          color: var(--text-color);
+          border: 1px solid var(--border-color-light);
+          border-radius: 6px;
+          outline: none;
+      }
+
+      .workspace-path-input:focus {
+          border-color: var(--link-color);
+      }
+
+      .workspace-path-input::placeholder {
+          color: var(--blockquote-color);
+      }
+
+      .workspace-error {
+          color: #e74c3c;
+          font-size: 13px;
+          margin: 8px 0 0 0;
+          display: none;
+      }
+
+      .workspace-recent-heading {
+          font-size: 13px;
+          color: var(--blockquote-color);
+          margin: 20px 0 8px 0;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+      }
+
+      .workspace-recent-list {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          max-height: 320px;
+          overflow-y: auto;
+      }
+
+      .workspace-recent-item {
+          display: flex;
+          align-items: center;
+          padding: 8px 12px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: background 0.15s;
+          gap: 10px;
+      }
+
+      .workspace-recent-item:hover {
+          background: var(--code-bg);
+      }
+
+      .workspace-recent-icon {
+          font-size: 16px;
+          flex-shrink: 0;
+          width: 20px;
+          text-align: center;
+      }
+
+      .workspace-recent-path {
+          font-family: var(--code-font);
+          font-size: 13px;
+          color: var(--text-color);
+          flex: 1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+      }
+
+      .workspace-empty {
+          text-align: center;
+          color: var(--blockquote-color);
+          font-size: 14px;
+          padding: 24px 0;
+      }
+
+      .workspace-picker-page {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+      }
+
+      .workspace-picker-page .workspace-modal-content {
+          max-width: 680px;
       }
 
       /* Theme-specific card styles */
@@ -2544,6 +2691,9 @@
             if (message.type === "Reload") {
               console.log("Reloading page via WebSocket");
               window.location.reload();
+            } else if (message.type === "WorkspaceChanged") {
+              console.log("Workspace changed to: " + message.base_dir);
+              window.location.href = '/';
             }
           } catch (error) {
             console.error("Error parsing WebSocket message:", error);
@@ -3051,6 +3201,17 @@
       </div>
     </div>
 
+    {% if daemon_mode|default(false) %}
+    <button
+      class="workspace-toggle"
+      onclick="openWorkspaceModal()"
+      title="Open workspace (o)"
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+      </svg>
+    </button>
+    {% endif %}
     <button
       class="about-toggle"
       onclick="openAboutModal()"
@@ -4027,6 +4188,82 @@
       })();
     </script>
     {% else %}
+    {% if no_workspace|default(false) %}
+    <div class="workspace-picker-page">
+      <div class="workspace-modal-content">
+        <img src="/static/mdlive.png" alt="mdlive" style="width:280px;display:block;margin:0 auto 16px" />
+        <h3 style="margin:0 0 16px 0;text-align:center;color:var(--text-color)">Open Workspace</h3>
+        <input
+          type="text"
+          class="workspace-path-input"
+          id="pickerPageInput"
+          placeholder="~/dev/my-project or ~/notes/todo.md"
+          autocomplete="off"
+          spellcheck="false"
+          autofocus
+        />
+        <p class="workspace-error" id="pickerPageError"></p>
+        <div class="workspace-recent-heading">Recent</div>
+        <ul class="workspace-recent-list" id="pickerPageRecentList"></ul>
+      </div>
+    </div>
+    <script>
+      (function() {
+          var input = document.getElementById('pickerPageInput');
+          var errEl = document.getElementById('pickerPageError');
+          var list = document.getElementById('pickerPageRecentList');
+
+          input.addEventListener('keydown', function(e) {
+              if (e.key === 'Enter') {
+                  var val = input.value.trim();
+                  if (val) doSwitch(val);
+              }
+          });
+
+          function doSwitch(path) {
+              if (errEl) { errEl.style.display = 'none'; }
+              fetch('/api/workspace/switch', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ path: path })
+              })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                  if (data.success) {
+                      window.location.href = '/';
+                  } else if (errEl) {
+                      errEl.textContent = data.error || 'Failed to open workspace';
+                      errEl.style.display = 'block';
+                  }
+              })
+              .catch(function(e) {
+                  if (errEl) {
+                      errEl.textContent = 'Network error: ' + e.message;
+                      errEl.style.display = 'block';
+                  }
+              });
+          }
+
+          fetch('/api/workspace/recent')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                  if (!data.recent || data.recent.length === 0) {
+                      list.innerHTML = '<li class="workspace-empty">No recent workspaces</li>';
+                      return;
+                  }
+                  data.recent.forEach(function(entry) {
+                      var li = document.createElement('li');
+                      li.className = 'workspace-recent-item';
+                      li.onclick = function() { doSwitch(entry.path); };
+                      var icon = entry.mode === 'directory' ? '\uD83D\uDCC1' : '\uD83D\uDCC4';
+                      li.innerHTML = '<span class="workspace-recent-icon">' + icon + '</span>' +
+                          '<span class="workspace-recent-path">' + entry.path.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</span>';
+                      list.appendChild(li);
+                  });
+              });
+      })();
+    </script>
+    {% else %}
     <div class="page-container">
       <div class="page-header">
         {% if current_file %}
@@ -4410,7 +4647,7 @@
           }
       })();
     </script>
-    {% endif %} {% endif %}
+    {% endif %} {% endif %} {% endif %}
 
     <div class="theme-modal" id="themeModal">
       <div class="theme-modal-content">
@@ -4535,6 +4772,10 @@
             <td>Close tab</td>
           </tr>
           <tr>
+            <td><span class="shortcuts-key">o</span></td>
+            <td>Open workspace</td>
+          </tr>
+          <tr>
             <td><span class="shortcuts-key">?</span></td>
             <td>About / attribution</td>
           </tr>
@@ -4568,6 +4809,26 @@
       </div>
     </div>
 
+    {% if daemon_mode|default(false) %}
+    <div class="workspace-modal" id="workspaceModal">
+      <div class="workspace-modal-content">
+        <h3>Open Workspace</h3>
+        <input
+          type="text"
+          class="workspace-path-input"
+          id="workspacePathInput"
+          placeholder="~/dev/my-project or ~/notes/todo.md"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <p class="workspace-error" id="workspaceError"></p>
+        <div class="workspace-recent-heading">Recent</div>
+        <ul class="workspace-recent-list" id="workspaceRecentList">
+        </ul>
+      </div>
+    </div>
+    {% endif %}
+
     <script>
       function openShortcutsModal() {
           document.getElementById('shortcutsModal').classList.add('show');
@@ -4580,6 +4841,81 @@
       }
       function closeAboutModal() {
           document.getElementById('aboutModal').classList.remove('show');
+      }
+
+      var _isDaemonMode = {{ daemon_mode|default(false)|tojson }};
+
+      function openWorkspaceModal() {
+          var modal = document.getElementById('workspaceModal');
+          if (!modal) return;
+          modal.classList.add('show');
+          loadRecentWorkspaces();
+          var input = document.getElementById('workspacePathInput');
+          if (input) setTimeout(function() { input.focus(); }, 100);
+      }
+
+      function closeWorkspaceModal() {
+          var modal = document.getElementById('workspaceModal');
+          if (!modal) return;
+          modal.classList.remove('show');
+          var err = document.getElementById('workspaceError');
+          if (err) { err.style.display = 'none'; err.textContent = ''; }
+      }
+
+      function loadRecentWorkspaces() {
+          var list = document.getElementById('workspaceRecentList');
+          if (!list) return;
+          fetch('/api/workspace/recent')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                  list.innerHTML = '';
+                  if (!data.recent || data.recent.length === 0) {
+                      list.innerHTML = '<li class="workspace-empty">No recent workspaces</li>';
+                      return;
+                  }
+                  data.recent.forEach(function(entry) {
+                      var li = document.createElement('li');
+                      li.className = 'workspace-recent-item';
+                      li.onclick = function() { switchWorkspace(entry.path); };
+                      var icon = entry.mode === 'directory' ? '\uD83D\uDCC1' : '\uD83D\uDCC4';
+                      li.innerHTML = '<span class="workspace-recent-icon">' + icon + '</span>' +
+                          '<span class="workspace-recent-path">' + escapeHtml(entry.path) + '</span>';
+                      list.appendChild(li);
+                  });
+              });
+      }
+
+      function switchWorkspace(path) {
+          var err = document.getElementById('workspaceError');
+          if (err) { err.style.display = 'none'; }
+          fetch('/api/workspace/switch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ path: path })
+          })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+              if (data.success) {
+                  window.location.href = '/';
+              } else {
+                  if (err) {
+                      err.textContent = data.error || 'Failed to switch workspace';
+                      err.style.display = 'block';
+                  }
+              }
+          })
+          .catch(function(e) {
+              if (err) {
+                  err.textContent = 'Network error: ' + e.message;
+                  err.style.display = 'block';
+              }
+          });
+      }
+
+      function escapeHtml(str) {
+          var div = document.createElement('div');
+          div.textContent = str;
+          return div.innerHTML;
       }
 
       document.addEventListener('keydown', function(e) {
@@ -4605,6 +4941,12 @@
           var aboutModal = document.getElementById('aboutModal');
           if (aboutModal && aboutModal.classList.contains('show')) {
               if (e.key === 'Escape') closeAboutModal();
+              return;
+          }
+
+          var workspaceModal = document.getElementById('workspaceModal');
+          if (workspaceModal && workspaceModal.classList.contains('show')) {
+              if (e.key === 'Escape') closeWorkspaceModal();
               return;
           }
 
@@ -4662,6 +5004,12 @@
                   e.preventDefault();
                   openAboutModal();
                   break;
+              case 'o':
+                  if (_isDaemonMode) {
+                      e.preventDefault();
+                      openWorkspaceModal();
+                  }
+                  break;
           }
       });
 
@@ -4674,6 +5022,26 @@
       document.getElementById('aboutModal').addEventListener('click', function(e) {
           if (e.target === this) closeAboutModal();
       });
+
+      // workspace modal: close on click outside, enter to submit
+      var wsModal = document.getElementById('workspaceModal');
+      if (wsModal) {
+          wsModal.addEventListener('click', function(e) {
+              if (e.target === this) closeWorkspaceModal();
+          });
+          var wsInput = document.getElementById('workspacePathInput');
+          if (wsInput) {
+              wsInput.addEventListener('keydown', function(e) {
+                  if (e.key === 'Enter') {
+                      var val = wsInput.value.trim();
+                      if (val) switchWorkspace(val);
+                  }
+                  if (e.key === 'Escape') {
+                      closeWorkspaceModal();
+                  }
+              });
+          }
+      }
     </script>
   </body>
 </html>

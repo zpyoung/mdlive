@@ -1,8 +1,35 @@
-use notify::Event;
+use anyhow::Result;
+use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
+use tokio::sync::mpsc;
+use tokio::task::AbortHandle;
 
 use crate::state::{ServerMessage, SharedMarkdownState};
 use crate::util::{is_image_file, is_supported_file};
+
+pub(crate) fn start_watcher(base_dir: &Path, state: SharedMarkdownState) -> Result<AbortHandle> {
+    let (tx, mut rx) = mpsc::channel(100);
+
+    let mut watcher = RecommendedWatcher::new(
+        move |res: std::result::Result<Event, notify::Error>| {
+            if let Ok(event) = res {
+                let _ = tx.blocking_send(event);
+            }
+        },
+        Config::default(),
+    )?;
+
+    watcher.watch(base_dir, RecursiveMode::Recursive)?;
+
+    let handle = tokio::spawn(async move {
+        let _watcher = watcher;
+        while let Some(event) = rx.recv().await {
+            handle_file_event(event, &state).await;
+        }
+    });
+
+    Ok(handle.abort_handle())
+}
 
 fn is_mdlive_path(path: &Path) -> bool {
     path.components().any(|c| c.as_os_str() == ".mdlive")
