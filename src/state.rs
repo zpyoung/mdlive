@@ -8,7 +8,9 @@ use std::{
     time::SystemTime,
 };
 use tokio::sync::{broadcast, Mutex};
+use tokio::task::AbortHandle;
 
+use crate::config::AppConfig;
 use crate::util::is_markdown_file;
 
 pub(crate) type SharedMarkdownState = Arc<Mutex<MarkdownState>>;
@@ -25,6 +27,7 @@ pub(crate) enum ClientMessage {
 pub enum ServerMessage {
     Reload,
     Pong,
+    WorkspaceChanged { base_dir: String },
 }
 
 pub(crate) struct TrackedFile {
@@ -46,6 +49,9 @@ pub(crate) struct MarkdownState {
     pub(crate) is_directory_mode: bool,
     pub(crate) change_tx: broadcast::Sender<ServerMessage>,
     pub(crate) mdlive_dir: Option<PathBuf>,
+    pub(crate) daemon_mode: bool,
+    pub(crate) watcher_abort: Option<AbortHandle>,
+    pub(crate) config: Option<AppConfig>,
 }
 
 impl MarkdownState {
@@ -93,7 +99,99 @@ impl MarkdownState {
             is_directory_mode,
             change_tx,
             mdlive_dir,
+            daemon_mode: false,
+            watcher_abort: None,
+            config: None,
         })
+    }
+
+    pub(crate) fn new_daemon() -> Self {
+        let (change_tx, _) = broadcast::channel::<ServerMessage>(16);
+        MarkdownState {
+            base_dir: PathBuf::new(),
+            tracked_files: HashMap::new(),
+            is_directory_mode: false,
+            change_tx,
+            mdlive_dir: None,
+            daemon_mode: true,
+            watcher_abort: None,
+            config: Some(AppConfig::load()),
+        }
+    }
+
+    pub(crate) fn new_daemon_with_config(config: AppConfig) -> Self {
+        let (change_tx, _) = broadcast::channel::<ServerMessage>(16);
+        MarkdownState {
+            base_dir: PathBuf::new(),
+            tracked_files: HashMap::new(),
+            is_directory_mode: false,
+            change_tx,
+            mdlive_dir: None,
+            daemon_mode: true,
+            watcher_abort: None,
+            config: Some(config),
+        }
+    }
+
+    pub(crate) fn has_workspace(&self) -> bool {
+        !self.base_dir.as_os_str().is_empty()
+    }
+
+    pub(crate) fn switch_workspace(
+        &mut self,
+        new_dir: PathBuf,
+        files: Vec<PathBuf>,
+        dir_mode: bool,
+    ) -> Result<()> {
+        if let Some(handle) = self.watcher_abort.take() {
+            handle.abort();
+        }
+
+        self.base_dir = new_dir;
+        self.is_directory_mode = dir_mode;
+        self.tracked_files.clear();
+
+        for file_path in files {
+            let metadata = fs::metadata(&file_path)?;
+            let last_modified = metadata.modified()?;
+            let created = metadata.created().unwrap_or(last_modified);
+            let content = fs::read_to_string(&file_path)?;
+            let html = Self::render_file_to_html(&file_path, &content)?;
+
+            let canonical = file_path.canonicalize().unwrap_or(file_path);
+            let key = canonical
+                .strip_prefix(&self.base_dir)
+                .unwrap_or(&canonical)
+                .to_string_lossy()
+                .to_string();
+
+            self.tracked_files.insert(
+                key,
+                TrackedFile {
+                    path: canonical,
+                    last_modified,
+                    created,
+                    html,
+                },
+            );
+        }
+
+        let dir = self.base_dir.join(".mdlive");
+        let history = dir.join("history");
+        let _ = fs::create_dir_all(&history);
+        self.mdlive_dir = Some(dir);
+
+        let mode = if dir_mode { "directory" } else { "file" };
+        if let Some(ref mut config) = self.config {
+            config.add_recent(self.base_dir.display().to_string(), mode.to_string());
+            let _ = config.save();
+        }
+
+        let _ = self.change_tx.send(ServerMessage::WorkspaceChanged {
+            base_dir: self.base_dir.display().to_string(),
+        });
+
+        Ok(())
     }
 
     pub(crate) fn show_navigation(&self) -> bool {

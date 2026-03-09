@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 
 use axum_test::TestServer;
-use mdlive::{new_router, scan_supported_files};
+use mdlive::new_router;
+pub use mdlive::scan_supported_files;
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -86,4 +87,13 @@ pub async fn create_directory_server() -> (TestServer, TempDir) {
 
 pub async fn create_directory_server_with_http() -> (TestServer, TempDir) {
     create_directory_server_impl(true)
+}
+
+pub fn create_daemon_server() -> (TestServer, TempDir) {
+    let config_dir = tempfile::tempdir().expect("Failed to create temp config dir");
+    let config_path = config_dir.path().join("config.toml");
+    let config = mdlive::AppConfig::load_from(config_path);
+    let router = mdlive::new_daemon_router_with_config(config);
+    let server = TestServer::new(router).expect("Failed to create daemon test server");
+    (server, config_dir)
 }

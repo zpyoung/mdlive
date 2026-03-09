@@ -1,17 +1,16 @@
 use anyhow::Result;
 use axum::{
-    routing::{delete, get, post},
+    routing::{get, post},
     Router,
 };
-use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 
 use crate::handlers;
 use crate::state::MarkdownState;
-use crate::watcher::handle_file_event;
+use crate::watcher::start_watcher;
 
 pub fn new_router(
     base_dir: PathBuf,
@@ -26,28 +25,24 @@ pub fn new_router(
         is_directory_mode,
     )?));
 
-    let watcher_state = state.clone();
-    let (tx, mut rx) = mpsc::channel(100);
+    let abort_handle = start_watcher(&base_dir, state.clone())?;
+    state.try_lock().unwrap().watcher_abort = Some(abort_handle);
 
-    let mut watcher = RecommendedWatcher::new(
-        move |res: std::result::Result<Event, notify::Error>| {
-            if let Ok(event) = res {
-                let _ = tx.blocking_send(event);
-            }
-        },
-        Config::default(),
-    )?;
+    Ok(build_routes(state))
+}
 
-    watcher.watch(&base_dir, RecursiveMode::Recursive)?;
+pub fn new_daemon_router() -> Router {
+    let state = Arc::new(Mutex::new(MarkdownState::new_daemon()));
+    build_routes(state)
+}
 
-    tokio::spawn(async move {
-        let _watcher = watcher;
-        while let Some(event) = rx.recv().await {
-            handle_file_event(event, &watcher_state).await;
-        }
-    });
+pub fn new_daemon_router_with_config(config: crate::config::AppConfig) -> Router {
+    let state = Arc::new(Mutex::new(MarkdownState::new_daemon_with_config(config)));
+    build_routes(state)
+}
 
-    let router = Router::new()
+fn build_routes(state: Arc<Mutex<MarkdownState>>) -> Router {
+    Router::new()
         .route("/", get(handlers::pages::serve_html_root))
         .route("/ws", get(handlers::websocket::websocket_handler))
         .route("/new", get(handlers::pages::serve_new_file_editor))
@@ -84,12 +79,22 @@ pub fn new_router(
         )
         .route(
             "/api/delete_history_entry",
-            delete(handlers::api::api_delete_history_entry),
+            axum::routing::delete(handlers::api::api_delete_history_entry),
+        )
+        .route(
+            "/api/workspace/switch",
+            post(handlers::workspace::api_workspace_switch),
+        )
+        .route(
+            "/api/workspace/current",
+            get(handlers::workspace::api_workspace_current),
+        )
+        .route(
+            "/api/workspace/recent",
+            get(handlers::workspace::api_workspace_recent),
         )
         .route("/edit/*filepath", get(handlers::pages::serve_editor))
         .route("/*filepath", get(handlers::pages::serve_file))
         .layer(CorsLayer::permissive())
-        .with_state(state);
-
-    Ok(router)
+        .with_state(state)
 }

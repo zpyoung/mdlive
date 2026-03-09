@@ -25,9 +25,16 @@ pub(crate) struct NewFileQuery {
 pub(crate) async fn serve_html_root(State(state): State<SharedMarkdownState>) -> impl IntoResponse {
     let mut state = state.lock().await;
 
+    if state.daemon_mode && !state.has_workspace() {
+        return render_workspace_picker(&state);
+    }
+
     let filename = match state.get_sorted_filenames().into_iter().next() {
         Some(name) => name,
         None => {
+            if state.daemon_mode {
+                return render_workspace_picker(&state);
+            }
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Html("No files available to serve".to_string()),
@@ -59,6 +66,51 @@ pub(crate) async fn serve_file(
         serve_static_file_inner(filepath, state).await
     } else {
         (StatusCode::NOT_FOUND, Html("File not found".to_string())).into_response()
+    }
+}
+
+fn render_workspace_picker(state: &MarkdownState) -> (StatusCode, Html<String>) {
+    let env = template_env();
+    let template = match env.get_template(TEMPLATE_NAME) {
+        Ok(t) => t,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Html(format!("Template error: {e}")),
+            );
+        }
+    };
+
+    let recent: Vec<minijinja::value::Value> = state
+        .config
+        .as_ref()
+        .map(|c| {
+            c.recent
+                .iter()
+                .map(|r| {
+                    minijinja::context! {
+                        path => r.path.clone(),
+                        mode => r.mode.clone(),
+                        last_opened => r.last_opened,
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    match template.render(context! {
+        daemon_mode => true,
+        no_workspace => true,
+        show_navigation => false,
+        recent_workspaces => recent,
+        current_file => "",
+        base_dir => "",
+    }) {
+        Ok(r) => (StatusCode::OK, Html(r)),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Html(format!("Rendering error: {e}")),
+        ),
     }
 }
 
@@ -109,6 +161,7 @@ pub(crate) async fn render_file(
             tree => tree,
             current_file => current_file,
             base_dir => state.base_dir.display().to_string(),
+            daemon_mode => state.daemon_mode,
         }) {
             Ok(r) => r,
             Err(e) => {
@@ -128,6 +181,7 @@ pub(crate) async fn render_file(
             has_history => has_history,
             current_file => current_file,
             base_dir => state.base_dir.display().to_string(),
+            daemon_mode => state.daemon_mode,
         }) {
             Ok(r) => r,
             Err(e) => {
@@ -225,6 +279,7 @@ fn render_editor(
             show_navigation => true,
             tree => tree,
             base_dir => state.base_dir.display().to_string(),
+            daemon_mode => state.daemon_mode,
         }) {
             Ok(r) => r,
             Err(e) => {
@@ -245,6 +300,7 @@ fn render_editor(
             has_history => has_history,
             show_navigation => false,
             base_dir => state.base_dir.display().to_string(),
+            daemon_mode => state.daemon_mode,
         }) {
             Ok(r) => r,
             Err(e) => {

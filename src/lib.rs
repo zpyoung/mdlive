@@ -1,3 +1,4 @@
+pub mod config;
 mod handlers;
 mod router;
 mod state;
@@ -11,6 +12,9 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
 use tokio::net::TcpListener;
 
+pub use config::AppConfig;
+pub use router::new_daemon_router;
+pub use router::new_daemon_router_with_config;
 pub use router::new_router;
 pub use state::ServerMessage;
 pub use util::scan_supported_files;
@@ -31,19 +35,46 @@ pub async fn serve_markdown(
     let (listener, actual_port) = bind_with_port_increment(hostname, port).await?;
 
     if actual_port != port {
-        println!("⚠️  Port {port} in use, using {actual_port} instead");
+        println!("  Port {port} in use, using {actual_port} instead");
     }
 
     let listen_addr = format_host(hostname, actual_port);
 
     if is_directory_mode {
-        println!("📁 Serving markdown files from: {}", base_dir.display());
+        println!("  Serving markdown files from: {}", base_dir.display());
     } else if let Some(file_path) = first_file {
-        println!("📄 Serving markdown file: {}", file_path.display());
+        println!("  Serving markdown file: {}", file_path.display());
     }
 
-    println!("🌐 Server running at: http://{listen_addr}");
-    println!("⚡ Live reload enabled");
+    println!("  Server running at: http://{listen_addr}");
+    println!("  Live reload enabled");
+    println!("\nPress Ctrl+C to stop the server");
+
+    if open {
+        let browse_addr = format_host(&browsable_host(hostname), actual_port);
+        open_browser(&format!("http://{browse_addr}"))?;
+    }
+
+    axum::serve(listener, router).await?;
+
+    Ok(())
+}
+
+pub async fn serve_daemon(hostname: impl AsRef<str>, port: u16, open: bool) -> Result<()> {
+    let hostname = hostname.as_ref();
+
+    let router = router::new_daemon_router();
+
+    let (listener, actual_port) = bind_with_port_increment(hostname, port).await?;
+
+    if actual_port != port {
+        println!("  Port {port} in use, using {actual_port} instead");
+    }
+
+    let listen_addr = format_host(hostname, actual_port);
+
+    println!("  mdlive daemon started");
+    println!("  Server running at: http://{listen_addr}");
     println!("\nPress Ctrl+C to stop the server");
 
     if open {
