@@ -43,6 +43,8 @@ enum ServiceAction {
     Install,
     /// Remove LaunchAgent
     Uninstall,
+    /// Start the daemon
+    Start,
     /// Stop the running daemon
     Stop,
     /// Check if the service is running
@@ -149,6 +151,19 @@ fn handle_service(action: ServiceAction, hostname: &str, port: u16) -> Result<()
                 println!("  http://{hostname}:{port}");
             } else {
                 anyhow::bail!("launchctl load failed");
+            }
+        }
+        ServiceAction::Start => {
+            if !plist_path.exists() {
+                anyhow::bail!("LaunchAgent not installed. Run `mdlive service install` first.");
+            }
+            let status = std::process::Command::new("launchctl")
+                .args(["start", LAUNCHD_LABEL])
+                .status()?;
+            if status.success() {
+                println!("Started {LAUNCHD_LABEL}");
+            } else {
+                anyhow::bail!("launchctl start failed");
             }
         }
         ServiceAction::Stop => {

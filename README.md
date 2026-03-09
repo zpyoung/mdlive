@@ -100,6 +100,7 @@ mdlive can install itself as a LaunchAgent so it starts automatically when you l
 ```bash
 mdlive service install              # install and start (port 3000)
 mdlive service install -p 3030      # use a specific port
+mdlive service start                # start the daemon
 mdlive service stop                 # stop the daemon
 mdlive service status               # check if it's running
 mdlive service uninstall            # stop and remove
@@ -137,6 +138,7 @@ mdlive docs/ -p 8080          # custom port
 mdlive file.md --no-open      # don't auto-open the browser
 mdlive file.md -H 0.0.0.0    # bind to all interfaces
 mdlive service install        # auto-start on login (macOS)
+mdlive service start          # start the daemon
 mdlive service stop           # stop the daemon
 mdlive service uninstall      # remove auto-start
 mdlive service status         # check daemon status
