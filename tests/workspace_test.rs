@@ -58,7 +58,7 @@ async fn test_workspace_switch_to_directory() {
     // verify current workspace updated
     let current = server.get("/api/workspace/current").await;
     let current_json: serde_json::Value = current.json();
-    assert!(current_json["base_dir"].as_str().unwrap().len() > 0);
+    assert!(!current_json["base_dir"].as_str().unwrap().is_empty());
 }
 
 #[tokio::test]

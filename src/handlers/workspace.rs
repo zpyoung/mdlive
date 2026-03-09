@@ -39,9 +39,9 @@ pub(crate) struct RecentResponse {
 }
 
 fn expand_path(raw: &str) -> PathBuf {
-    let expanded = if raw.starts_with('~') {
+    let expanded = if let Some(rest) = raw.strip_prefix('~') {
         if let Some(home) = dirs::home_dir() {
-            home.join(raw.strip_prefix("~/").unwrap_or(&raw[1..]))
+            home.join(rest.strip_prefix('/').unwrap_or(rest))
         } else {
             PathBuf::from(raw)
         }
