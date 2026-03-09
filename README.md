@@ -13,13 +13,19 @@ https://github.com/bearded-giant/mdlive/raw/main/docs/images/mdlive.mp4
 ## Install
 
 ```bash
+cargo install mdlive                          # from crates.io
+brew install bearded-giant/tap/mdlive         # homebrew (macOS / Linux)
+```
+
+Or build from source:
+
+```bash
 git clone https://github.com/bearded-giant/mdlive.git
 cd mdlive
 cargo build --release
-# binary is at target/release/mdlive
 ```
 
-Single binary, no runtime dependencies. Everything (templates, JS libraries, images) is embedded at compile time.
+Single binary, no runtime dependencies. Everything (templates, JS libraries, images) is embedded at compile time. Prebuilt binaries for macOS and Linux (x86_64 + aarch64) are also available on the [releases page](https://github.com/bearded-giant/mdlive/releases).
 
 ### Claude Code plugin
 

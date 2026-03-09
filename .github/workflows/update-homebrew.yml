@@ -3,24 +3,33 @@ name: Update Homebrew Tap
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v2.0.0)'
+        required: true
 
 jobs:
   update-tap:
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
 
     steps:
     - name: Get release version
       id: version
-      run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
     - name: Download release binaries and compute checksums
       id: shas
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        BASE="https://github.com/bearded-giant/mdlive/releases/download/${{ github.ref_name }}"
         for target in x86_64-apple-darwin aarch64-apple-darwin x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
-          curl -sL "$BASE/mdlive-$target" -o "mdlive-$target"
+          gh release download "$TAG" \
+            --repo bearded-giant/mdlive \
+            --pattern "mdlive-$target" \
+            --dir .
           sha=$(sha256sum "mdlive-$target" | cut -d' ' -f1)
           key=$(echo "$target" | tr '-' '_')
           echo "${key}=${sha}" >> "$GITHUB_OUTPUT"
@@ -40,30 +49,31 @@ jobs:
         SHA_X86_LINUX: ${{ steps.shas.outputs.x86_64_unknown_linux_gnu }}
         SHA_ARM_LINUX: ${{ steps.shas.outputs.aarch64_unknown_linux_gnu }}
       run: |
-        cat > Formula/mdlive.rb << 'FORMULA'
+        mkdir -p Formula
+        cat > Formula/mdlive.rb << EOF
         class Mdlive < Formula
           desc "Markdown workspace server for AI coding agents"
           homepage "https://github.com/bearded-giant/mdlive"
-          version "VERSION_PLACEHOLDER"
+          version "$VERSION"
           license "MIT"
 
           on_macos do
             if Hardware::CPU.arm?
               url "https://github.com/bearded-giant/mdlive/releases/download/v#{version}/mdlive-aarch64-apple-darwin"
-              sha256 "SHA_ARM_MACOS_PLACEHOLDER"
+              sha256 "$SHA_ARM_MACOS"
             else
               url "https://github.com/bearded-giant/mdlive/releases/download/v#{version}/mdlive-x86_64-apple-darwin"
-              sha256 "SHA_X86_MACOS_PLACEHOLDER"
+              sha256 "$SHA_X86_MACOS"
             end
           end
 
           on_linux do
             if Hardware::CPU.arm?
               url "https://github.com/bearded-giant/mdlive/releases/download/v#{version}/mdlive-aarch64-unknown-linux-gnu"
-              sha256 "SHA_ARM_LINUX_PLACEHOLDER"
+              sha256 "$SHA_ARM_LINUX"
             else
               url "https://github.com/bearded-giant/mdlive/releases/download/v#{version}/mdlive-x86_64-unknown-linux-gnu"
-              sha256 "SHA_X86_LINUX_PLACEHOLDER"
+              sha256 "$SHA_X86_LINUX"
             end
           end
 
@@ -75,13 +85,7 @@ jobs:
             assert_match version.to_s, shell_output("#{bin}/mdlive --version")
           end
         end
-        FORMULA
-
-        sed -i "s/VERSION_PLACEHOLDER/$VERSION/" Formula/mdlive.rb
-        sed -i "s/SHA_ARM_MACOS_PLACEHOLDER/$SHA_ARM_MACOS/" Formula/mdlive.rb
-        sed -i "s/SHA_X86_MACOS_PLACEHOLDER/$SHA_X86_MACOS/" Formula/mdlive.rb
-        sed -i "s/SHA_ARM_LINUX_PLACEHOLDER/$SHA_ARM_LINUX/" Formula/mdlive.rb
-        sed -i "s/SHA_X86_LINUX_PLACEHOLDER/$SHA_X86_LINUX/" Formula/mdlive.rb
+        EOF
 
     - name: Commit and push
       run: |
