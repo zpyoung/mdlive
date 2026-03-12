@@ -664,6 +664,14 @@ async fn test_content_width_css_presets_present() {
         "wide CSS variable value should be 1200px"
     );
     assert!(
+        body.contains(r#"[data-width="ultrawide"]"#),
+        "ultrawide data-width selector should be present"
+    );
+    assert!(
+        body.contains("--content-max-width: 1500px"),
+        "ultrawide CSS variable value should be 1500px"
+    );
+    assert!(
         body.contains(r#"[data-width="full"]"#),
         "full data-width selector should be present"
     );
@@ -690,6 +698,10 @@ async fn test_content_width_modal_ui() {
     assert!(body.contains("Narrow"), "Narrow label should be present");
     assert!(body.contains("Default"), "Default label should be present");
     assert!(body.contains("Wide"), "Wide label should be present");
+    assert!(
+        body.contains("Ultra Wide"),
+        "Ultra Wide label should be present"
+    );
     assert!(body.contains("Full"), "Full label should be present");
 
     // onclick handlers on width cards
@@ -704,6 +716,10 @@ async fn test_content_width_modal_ui() {
     assert!(
         body.contains("onclick=\"setContentWidth('wide')\""),
         "wide onclick should be present"
+    );
+    assert!(
+        body.contains("onclick=\"setContentWidth('ultrawide')\""),
+        "ultrawide onclick should be present"
     );
     assert!(
         body.contains("onclick=\"setContentWidth('full')\""),
@@ -724,8 +740,16 @@ async fn test_content_width_modal_ui() {
         "1200px value should be shown in width card"
     );
     assert!(
+        body.contains("1500px"),
+        "1500px value should be shown in width card"
+    );
+    assert!(
         body.contains("100%"),
         "100% value should be shown in width card"
+    );
+    assert!(
+        body.contains("grid-template-columns: repeat(5, 1fr)"),
+        "width grid should use 5-column layout"
     );
 }
 
@@ -753,6 +777,10 @@ async fn test_content_width_js_functions() {
         body.contains("WIDTH_PRESETS"),
         "WIDTH_PRESETS array should be present"
     );
+    assert!(
+        body.contains("'ultrawide'"),
+        "WIDTH_PRESETS array should contain 'ultrawide'"
+    );
 }
 
 #[tokio::test]
@@ -770,6 +798,10 @@ async fn test_content_width_early_script_fouc_prevention() {
     assert!(
         body.contains("validWidths"),
         "early script should have a validWidths whitelist"
+    );
+    assert!(
+        body.contains("'ultrawide'"),
+        "early script validWidths should contain 'ultrawide'"
     );
     assert!(
         body.contains(r#"setAttribute("data-width""#),
@@ -820,6 +852,14 @@ async fn test_content_width_works_in_directory_mode() {
         "wide width value should be present in directory mode"
     );
     assert!(
+        body.contains(r#"[data-width="ultrawide"]"#),
+        "ultrawide CSS preset should be present in directory mode"
+    );
+    assert!(
+        body.contains("--content-max-width: 1500px"),
+        "ultrawide width value should be present in directory mode"
+    );
+    assert!(
         body.contains(r#"[data-width="full"]"#),
         "full CSS preset should be present in directory mode"
     );
@@ -830,6 +870,14 @@ async fn test_content_width_works_in_directory_mode() {
     assert!(
         body.contains("onclick=\"setContentWidth('narrow')\""),
         "width card onclick should be present in directory mode"
+    );
+    assert!(
+        body.contains("onclick=\"setContentWidth('ultrawide')\""),
+        "ultrawide width card onclick should be present in directory mode"
+    );
+    assert!(
+        body.contains("Ultra Wide"),
+        "Ultra Wide label should be present in directory mode"
     );
 }
 
