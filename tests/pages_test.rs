@@ -636,3 +636,218 @@ async fn test_mermaid_js_etag_caching() {
     assert_eq!(response_200.status_code(), 200);
     assert!(!response_200.as_bytes().is_empty());
 }
+
+// --- content width tests ---
+
+#[tokio::test]
+async fn test_content_width_css_presets_present() {
+    let (server, _, _dir) = create_test_server("# Width CSS Test").await;
+
+    let response = server.get("/").await;
+    assert_eq!(response.status_code(), 200);
+    let body = response.text();
+
+    assert!(
+        body.contains(r#"[data-width="narrow"]"#),
+        "narrow data-width selector should be present"
+    );
+    assert!(
+        body.contains("--content-max-width: 680px"),
+        "narrow CSS variable value should be 680px"
+    );
+    assert!(
+        body.contains(r#"[data-width="wide"]"#),
+        "wide data-width selector should be present"
+    );
+    assert!(
+        body.contains("--content-max-width: 1200px"),
+        "wide CSS variable value should be 1200px"
+    );
+    assert!(
+        body.contains(r#"[data-width="full"]"#),
+        "full data-width selector should be present"
+    );
+    assert!(
+        body.contains("--content-max-width: 100%"),
+        "full CSS variable value should be 100%"
+    );
+}
+
+#[tokio::test]
+async fn test_content_width_modal_ui() {
+    let (server, _, _dir) = create_test_server("# Width Modal Test").await;
+
+    let response = server.get("/").await;
+    assert_eq!(response.status_code(), 200);
+    let body = response.text();
+
+    assert!(
+        body.contains("Content Width"),
+        "Appearance modal should have a Content Width heading"
+    );
+
+    // Width card labels
+    assert!(body.contains("Narrow"), "Narrow label should be present");
+    assert!(body.contains("Default"), "Default label should be present");
+    assert!(body.contains("Wide"), "Wide label should be present");
+    assert!(body.contains("Full"), "Full label should be present");
+
+    // onclick handlers on width cards
+    assert!(
+        body.contains("onclick=\"setContentWidth('narrow')\""),
+        "narrow onclick should be present"
+    );
+    assert!(
+        body.contains("onclick=\"setContentWidth('default')\""),
+        "default onclick should be present"
+    );
+    assert!(
+        body.contains("onclick=\"setContentWidth('wide')\""),
+        "wide onclick should be present"
+    );
+    assert!(
+        body.contains("onclick=\"setContentWidth('full')\""),
+        "full onclick should be present"
+    );
+
+    // Pixel / percentage values shown in cards
+    assert!(
+        body.contains("680px"),
+        "680px value should be shown in width card"
+    );
+    assert!(
+        body.contains("900px"),
+        "900px value should be shown in width card"
+    );
+    assert!(
+        body.contains("1200px"),
+        "1200px value should be shown in width card"
+    );
+    assert!(
+        body.contains("100%"),
+        "100% value should be shown in width card"
+    );
+}
+
+#[tokio::test]
+async fn test_content_width_js_functions() {
+    let (server, _, _dir) = create_test_server("# Width JS Test").await;
+
+    let response = server.get("/").await;
+    assert_eq!(response.status_code(), 200);
+    let body = response.text();
+
+    assert!(
+        body.contains("function setContentWidth"),
+        "setContentWidth function should be present"
+    );
+    assert!(
+        body.contains("function cycleContentWidth"),
+        "cycleContentWidth function should be present"
+    );
+    assert!(
+        body.contains("function updateWidthSelection"),
+        "updateWidthSelection function should be present"
+    );
+    assert!(
+        body.contains("WIDTH_PRESETS"),
+        "WIDTH_PRESETS array should be present"
+    );
+}
+
+#[tokio::test]
+async fn test_content_width_early_script_fouc_prevention() {
+    let (server, _, _dir) = create_test_server("# FOUC Prevention Test").await;
+
+    let response = server.get("/").await;
+    assert_eq!(response.status_code(), 200);
+    let body = response.text();
+
+    assert!(
+        body.contains(r#"localStorage.getItem("content-width")"#),
+        "early script should read content-width from localStorage"
+    );
+    assert!(
+        body.contains("validWidths"),
+        "early script should have a validWidths whitelist"
+    );
+    assert!(
+        body.contains(r#"setAttribute("data-width""#),
+        "early script should set data-width attribute"
+    );
+}
+
+#[tokio::test]
+async fn test_content_width_keyboard_shortcut() {
+    let (server, _, _dir) = create_test_server("# Keyboard Shortcut Test").await;
+
+    let response = server.get("/").await;
+    assert_eq!(response.status_code(), 200);
+    let body = response.text();
+
+    assert!(
+        body.contains("Shift+W"),
+        "Shift+W shortcut key label should be in the shortcuts modal"
+    );
+    assert!(
+        body.contains("Cycle content width"),
+        "Cycle content width description should be in the shortcuts modal"
+    );
+}
+
+#[tokio::test]
+async fn test_content_width_works_in_directory_mode() {
+    let (server, _temp_dir) = create_directory_server().await;
+
+    let response = server.get("/test1.md").await;
+    assert_eq!(response.status_code(), 200);
+    let body = response.text();
+
+    assert!(
+        body.contains(r#"[data-width="narrow"]"#),
+        "narrow CSS preset should be present in directory mode"
+    );
+    assert!(
+        body.contains("--content-max-width: 680px"),
+        "narrow width value should be present in directory mode"
+    );
+    assert!(
+        body.contains(r#"[data-width="wide"]"#),
+        "wide CSS preset should be present in directory mode"
+    );
+    assert!(
+        body.contains("--content-max-width: 1200px"),
+        "wide width value should be present in directory mode"
+    );
+    assert!(
+        body.contains(r#"[data-width="full"]"#),
+        "full CSS preset should be present in directory mode"
+    );
+    assert!(
+        body.contains("Content Width"),
+        "Content Width modal heading should be present in directory mode"
+    );
+    assert!(
+        body.contains("onclick=\"setContentWidth('narrow')\""),
+        "width card onclick should be present in directory mode"
+    );
+}
+
+#[tokio::test]
+async fn test_content_width_single_file_uses_css_variable() {
+    let (server, _, _dir) = create_test_server("# CSS Variable Test").await;
+
+    let response = server.get("/").await;
+    assert_eq!(response.status_code(), 200);
+    let body = response.text();
+
+    assert!(
+        body.contains("max-width: var(--content-max-width)"),
+        ".page-container should use var(--content-max-width) for max-width"
+    );
+    // Ensure the old hardcoded percentage width is not used on .page-container
+    assert!(
+        !body.contains("width: 75%"),
+        ".page-container should not use a hardcoded width: 75%"
+    );
+}
