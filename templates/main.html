@@ -57,7 +57,9 @@
             }
           }
         } catch(e) {
-          /* localStorage unavailable */
+          /* localStorage unavailable — apply safe defaults */
+          document.documentElement.setAttribute("data-theme", "catppuccin-mocha");
+          document.documentElement.setAttribute("data-width", "default");
         } finally {
           document.documentElement.classList.add("theme-initialized");
         }
