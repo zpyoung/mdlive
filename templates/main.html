@@ -597,7 +597,7 @@
           min-height: 100vh;
       }
       .page-container {
-          width: 75%;
+          max-width: var(--content-max-width);
           margin: 0 auto;
       }
       {% endif %}
@@ -4809,7 +4809,7 @@
             <div class="theme-card-name">Wide</div>
             <div class="theme-card-sample">1200px</div>
           </div>
-          <div class="width-card" data-width="full" onclick="setContentWidth('full')">
+                    <div class="width-card" data-width="full" onclick="setContentWidth('full')">
             <div class="theme-card-icon">[  ]</div>
             <div class="theme-card-name">Full</div>
             <div class="theme-card-sample">100%</div>
