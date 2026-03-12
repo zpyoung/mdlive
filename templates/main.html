@@ -9,52 +9,57 @@
     <!-- Critical: Apply theme and sidebar state before first paint to prevent flash -->
     <script>
       (function () {
-        // Apply theme immediately
-        const theme = localStorage.getItem("theme") || "catppuccin-mocha";
-        document.documentElement.setAttribute("data-theme", theme);
-        document.documentElement.classList.add("theme-initialized");
+        try {
+          // Apply theme immediately
+          const theme = localStorage.getItem("theme") || "catppuccin-mocha";
+          document.documentElement.setAttribute("data-theme", theme);
 
-        // Restore saved sidebar width before paint
-        const savedWidth = localStorage.getItem("sidebar-width");
-        if (savedWidth) {
-          document.documentElement.style.setProperty(
-            "--sidebar-width",
-            savedWidth + "px",
-          );
-        }
-
-        // Restore content width before first paint to prevent FOUC
-        const savedWidth = localStorage.getItem("content-width");
-        const validWidths = ['narrow', 'default', 'wide', 'full'];
-        if (savedWidth && validWidths.includes(savedWidth)) {
-          document.documentElement.setAttribute("data-width", savedWidth);
-        }
-
-        // restore editor split ratio
-        const savedSplit = localStorage.getItem("editor-split");
-        if (savedSplit) {
-          document.documentElement.style.setProperty(
-            "--editor-split",
-            savedSplit + "%",
-          );
-        }
-
-        // Apply sidebar state to both html and body elements
-        // This works because body inherits the collapsed state via CSS selectors
-        const isSidebarCollapsed =
-          localStorage.getItem("sidebar-collapsed") === "true";
-        if (isSidebarCollapsed) {
-          // Set on html first for early rendering
-          document.documentElement.classList.add("sidebar-collapsed");
-
-          // Transfer to body when available
-          if (document.body) {
-            document.body.classList.add("sidebar-collapsed");
-          } else {
-            document.addEventListener("DOMContentLoaded", function () {
-              document.body.classList.add("sidebar-collapsed");
-            });
+          // Restore saved sidebar width before paint
+          const savedSidebarWidth = localStorage.getItem("sidebar-width");
+          if (savedSidebarWidth) {
+            document.documentElement.style.setProperty(
+              "--sidebar-width",
+              savedSidebarWidth + "px",
+            );
           }
+
+          // Restore content width before first paint to prevent FOUC
+          const savedContentWidth = localStorage.getItem("content-width");
+          const validWidths = ['narrow', 'default', 'wide', 'full'];
+          if (savedContentWidth && validWidths.includes(savedContentWidth)) {
+            document.documentElement.setAttribute("data-width", savedContentWidth);
+          }
+
+          // restore editor split ratio
+          const savedSplit = localStorage.getItem("editor-split");
+          if (savedSplit) {
+            document.documentElement.style.setProperty(
+              "--editor-split",
+              savedSplit + "%",
+            );
+          }
+
+          // Apply sidebar state to both html and body elements
+          // This works because body inherits the collapsed state via CSS selectors
+          const isSidebarCollapsed =
+            localStorage.getItem("sidebar-collapsed") === "true";
+          if (isSidebarCollapsed) {
+            // Set on html first for early rendering
+            document.documentElement.classList.add("sidebar-collapsed");
+
+            // Transfer to body when available
+            if (document.body) {
+              document.body.classList.add("sidebar-collapsed");
+            } else {
+              document.addEventListener("DOMContentLoaded", function () {
+                document.body.classList.add("sidebar-collapsed");
+              });
+            }
+          }
+        } catch(e) {
+          /* localStorage unavailable */
+        } finally {
+          document.documentElement.classList.add("theme-initialized");
         }
       })();
     </script>
@@ -2009,6 +2014,7 @@
       const WIDTH_PRESETS = ['narrow', 'default', 'wide', 'full'];
 
       function setContentWidth(preset) {
+        if (!WIDTH_PRESETS.includes(preset)) preset = 'default';
         document.documentElement.setAttribute('data-width', preset);
         try { localStorage.setItem('content-width', preset); } catch (e) {}
         updateWidthSelection(preset);
@@ -5096,8 +5102,10 @@
                   }
                   break;
               case 'W':
-                  e.preventDefault();
-                  cycleContentWidth();
+                  if (e.shiftKey) {
+                      e.preventDefault();
+                      cycleContentWidth();
+                  }
                   break;
           }
       });
