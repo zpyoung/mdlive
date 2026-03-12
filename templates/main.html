@@ -23,6 +23,13 @@
           );
         }
 
+        // Restore content width before first paint to prevent FOUC
+        const savedWidth = localStorage.getItem("content-width");
+        const validWidths = ['narrow', 'default', 'wide', 'full'];
+        if (savedWidth && validWidths.includes(savedWidth)) {
+          document.documentElement.setAttribute("data-width", savedWidth);
+        }
+
         // restore editor split ratio
         const savedSplit = localStorage.getItem("editor-split");
         if (savedSplit) {
@@ -1249,6 +1256,33 @@
           max-width: 680px;
       }
 
+      /* Content width presets */
+      [data-width="narrow"]  { --content-max-width: 680px; }
+      /* [data-width="default"] uses :root default of 900px — no override needed */
+      [data-width="wide"]    { --content-max-width: 1200px; }
+      [data-width="full"]    { --content-max-width: 100%; }
+
+      .width-card {
+          border: 2px solid transparent;
+          border-radius: 8px;
+          padding: 16px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-align: center;
+          background: var(--code-bg);
+          color: var(--text-color);
+      }
+
+      .width-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .width-card.selected {
+          border-color: var(--link-color);
+          box-shadow: 0 0 0 1px var(--link-color);
+      }
+
       /* Theme-specific card styles */
       .theme-card[data-theme="light"] {
           background: #fff;
@@ -1968,6 +2002,28 @@
           } else {
             card.classList.remove("selected");
           }
+        });
+      }
+
+      // Content width management
+      const WIDTH_PRESETS = ['narrow', 'default', 'wide', 'full'];
+
+      function setContentWidth(preset) {
+        document.documentElement.setAttribute('data-width', preset);
+        try { localStorage.setItem('content-width', preset); } catch (e) {}
+        updateWidthSelection(preset);
+      }
+
+      function cycleContentWidth() {
+        const current = document.documentElement.getAttribute('data-width') || 'default';
+        const idx = WIDTH_PRESETS.indexOf(current);
+        const next = WIDTH_PRESETS[(idx + 1) % WIDTH_PRESETS.length];
+        setContentWidth(next);
+      }
+
+      function updateWidthSelection(preset) {
+        document.querySelectorAll('.width-card').forEach(function(card) {
+          card.classList.toggle('selected', card.dataset.width === preset);
         });
       }
 
@@ -2714,6 +2770,8 @@
       // Initialize theme and live reload on page load
       document.addEventListener("DOMContentLoaded", function () {
         initTheme();
+        const currentWidth = document.documentElement.getAttribute('data-width') || 'default';
+        updateWidthSelection(currentWidth);
         initSidebar();
         initSidebarResize();
         initTreeState();
@@ -4651,7 +4709,7 @@
 
     <div class="theme-modal" id="themeModal">
       <div class="theme-modal-content">
-        <h3>Choose Theme</h3>
+        <h3>Appearance</h3>
         <div class="theme-grid">
           <div
             class="theme-card"
@@ -4728,6 +4786,29 @@
             <div class="theme-card-sample">Classic dark</div>
           </div>
         </div>
+        <h4 style="margin: 20px 0 12px 0; text-align: center;">Content Width</h4>
+        <div class="theme-grid" style="grid-template-columns: repeat(4, 1fr);">
+          <div class="width-card" data-width="narrow" onclick="setContentWidth('narrow')">
+            <div class="theme-card-icon">|||</div>
+            <div class="theme-card-name">Narrow</div>
+            <div class="theme-card-sample">680px</div>
+          </div>
+          <div class="width-card" data-width="default" onclick="setContentWidth('default')">
+            <div class="theme-card-icon">| |</div>
+            <div class="theme-card-name">Default</div>
+            <div class="theme-card-sample">900px</div>
+          </div>
+          <div class="width-card" data-width="wide" onclick="setContentWidth('wide')">
+            <div class="theme-card-icon">|  |</div>
+            <div class="theme-card-name">Wide</div>
+            <div class="theme-card-sample">1200px</div>
+          </div>
+          <div class="width-card" data-width="full" onclick="setContentWidth('full')">
+            <div class="theme-card-icon">[  ]</div>
+            <div class="theme-card-name">Full</div>
+            <div class="theme-card-sample">100%</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -4770,6 +4851,10 @@
           <tr>
             <td><span class="shortcuts-key">w</span></td>
             <td>Close tab</td>
+          </tr>
+          <tr>
+            <td><span class="shortcuts-key">Shift+W</span></td>
+            <td>Cycle content width</td>
           </tr>
           <tr>
             <td><span class="shortcuts-key">o</span></td>
@@ -5009,6 +5094,10 @@
                       e.preventDefault();
                       openWorkspaceModal();
                   }
+                  break;
+              case 'W':
+                  e.preventDefault();
+                  cycleContentWidth();
                   break;
           }
       });
