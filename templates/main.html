@@ -9,45 +9,59 @@
     <!-- Critical: Apply theme and sidebar state before first paint to prevent flash -->
     <script>
       (function () {
-        // Apply theme immediately
-        const theme = localStorage.getItem("theme") || "catppuccin-mocha";
-        document.documentElement.setAttribute("data-theme", theme);
-        document.documentElement.classList.add("theme-initialized");
+        try {
+          // Apply theme immediately
+          const theme = localStorage.getItem("theme") || "catppuccin-mocha";
+          document.documentElement.setAttribute("data-theme", theme);
 
-        // Restore saved sidebar width before paint
-        const savedWidth = localStorage.getItem("sidebar-width");
-        if (savedWidth) {
-          document.documentElement.style.setProperty(
-            "--sidebar-width",
-            savedWidth + "px",
-          );
-        }
-
-        // restore editor split ratio
-        const savedSplit = localStorage.getItem("editor-split");
-        if (savedSplit) {
-          document.documentElement.style.setProperty(
-            "--editor-split",
-            savedSplit + "%",
-          );
-        }
-
-        // Apply sidebar state to both html and body elements
-        // This works because body inherits the collapsed state via CSS selectors
-        const isSidebarCollapsed =
-          localStorage.getItem("sidebar-collapsed") === "true";
-        if (isSidebarCollapsed) {
-          // Set on html first for early rendering
-          document.documentElement.classList.add("sidebar-collapsed");
-
-          // Transfer to body when available
-          if (document.body) {
-            document.body.classList.add("sidebar-collapsed");
-          } else {
-            document.addEventListener("DOMContentLoaded", function () {
-              document.body.classList.add("sidebar-collapsed");
-            });
+          // Restore saved sidebar width before paint
+          const savedSidebarWidth = localStorage.getItem("sidebar-width");
+          if (savedSidebarWidth) {
+            document.documentElement.style.setProperty(
+              "--sidebar-width",
+              savedSidebarWidth + "px",
+            );
           }
+
+          // Restore content width before first paint to prevent FOUC
+          const savedContentWidth = localStorage.getItem("content-width");
+          const validWidths = ['narrow', 'default', 'wide', 'full'];
+          if (savedContentWidth && validWidths.includes(savedContentWidth)) {
+            document.documentElement.setAttribute("data-width", savedContentWidth);
+          }
+
+          // restore editor split ratio
+          const savedSplit = localStorage.getItem("editor-split");
+          if (savedSplit) {
+            document.documentElement.style.setProperty(
+              "--editor-split",
+              savedSplit + "%",
+            );
+          }
+
+          // Apply sidebar state to both html and body elements
+          // This works because body inherits the collapsed state via CSS selectors
+          const isSidebarCollapsed =
+            localStorage.getItem("sidebar-collapsed") === "true";
+          if (isSidebarCollapsed) {
+            // Set on html first for early rendering
+            document.documentElement.classList.add("sidebar-collapsed");
+
+            // Transfer to body when available
+            if (document.body) {
+              document.body.classList.add("sidebar-collapsed");
+            } else {
+              document.addEventListener("DOMContentLoaded", function () {
+                document.body.classList.add("sidebar-collapsed");
+              });
+            }
+          }
+        } catch(e) {
+          /* localStorage unavailable — apply safe defaults */
+          document.documentElement.setAttribute("data-theme", "catppuccin-mocha");
+          document.documentElement.setAttribute("data-width", "default");
+        } finally {
+          document.documentElement.classList.add("theme-initialized");
         }
       })();
     </script>
@@ -585,7 +599,7 @@
           min-height: 100vh;
       }
       .page-container {
-          width: 75%;
+          max-width: var(--content-max-width);
           margin: 0 auto;
       }
       {% endif %}
@@ -1247,6 +1261,33 @@
 
       .workspace-picker-page .workspace-modal-content {
           max-width: 680px;
+      }
+
+      /* Content width presets */
+      :root[data-width="narrow"]     { --content-max-width: 680px; }
+      /* [data-width="default"] uses :root default of 900px — no override needed */
+      :root[data-width="wide"]       { --content-max-width: 1200px; }
+      :root[data-width="full"]       { --content-max-width: 100%; }
+
+      .width-card {
+          border: 2px solid transparent;
+          border-radius: 8px;
+          padding: 16px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-align: center;
+          background: var(--code-bg);
+          color: var(--text-color);
+      }
+
+      .width-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .width-card.selected {
+          border-color: var(--link-color);
+          box-shadow: 0 0 0 1px var(--link-color);
       }
 
       /* Theme-specific card styles */
@@ -1968,6 +2009,29 @@
           } else {
             card.classList.remove("selected");
           }
+        });
+      }
+
+      // Content width management
+      const WIDTH_PRESETS = ['narrow', 'default', 'wide', 'full'];
+
+      function setContentWidth(preset) {
+        if (!WIDTH_PRESETS.includes(preset)) preset = 'default';
+        document.documentElement.setAttribute('data-width', preset);
+        try { localStorage.setItem('content-width', preset); } catch (e) {}
+        updateWidthSelection(preset);
+      }
+
+      function cycleContentWidth() {
+        const current = document.documentElement.getAttribute('data-width') || 'default';
+        const idx = WIDTH_PRESETS.indexOf(current);
+        const next = WIDTH_PRESETS[(idx + 1) % WIDTH_PRESETS.length];
+        setContentWidth(next);
+      }
+
+      function updateWidthSelection(preset) {
+        document.querySelectorAll('.width-card').forEach(function(card) {
+          card.classList.toggle('selected', card.dataset.width === preset);
         });
       }
 
@@ -2714,6 +2778,8 @@
       // Initialize theme and live reload on page load
       document.addEventListener("DOMContentLoaded", function () {
         initTheme();
+        const currentWidth = document.documentElement.getAttribute('data-width') || 'default';
+        updateWidthSelection(currentWidth);
         initSidebar();
         initSidebarResize();
         initTreeState();
@@ -4651,7 +4717,7 @@
 
     <div class="theme-modal" id="themeModal">
       <div class="theme-modal-content">
-        <h3>Choose Theme</h3>
+        <h3>Appearance</h3>
         <div class="theme-grid">
           <div
             class="theme-card"
@@ -4728,6 +4794,29 @@
             <div class="theme-card-sample">Classic dark</div>
           </div>
         </div>
+        <h4 style="margin: 20px 0 12px 0; text-align: center;">Content Width</h4>
+        <div class="theme-grid" style="grid-template-columns: repeat(4, 1fr);">
+          <button type="button" class="width-card" data-width="narrow" onclick="setContentWidth('narrow')">
+            <div class="theme-card-icon">|||</div>
+            <div class="theme-card-name">Narrow</div>
+            <div class="theme-card-sample">680px</div>
+          </button>
+          <button type="button" class="width-card" data-width="default" onclick="setContentWidth('default')">
+            <div class="theme-card-icon">| |</div>
+            <div class="theme-card-name">Default</div>
+            <div class="theme-card-sample">900px</div>
+          </button>
+          <button type="button" class="width-card" data-width="wide" onclick="setContentWidth('wide')">
+            <div class="theme-card-icon">|  |</div>
+            <div class="theme-card-name">Wide</div>
+            <div class="theme-card-sample">1200px</div>
+          </button>
+          <button type="button" class="width-card" data-width="full" onclick="setContentWidth('full')">
+            <div class="theme-card-icon">[  ]</div>
+            <div class="theme-card-name">Full</div>
+            <div class="theme-card-sample">100%</div>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -4770,6 +4859,10 @@
           <tr>
             <td><span class="shortcuts-key">w</span></td>
             <td>Close tab</td>
+          </tr>
+          <tr>
+            <td><span class="shortcuts-key">Shift+W</span></td>
+            <td>Cycle content width</td>
           </tr>
           <tr>
             <td><span class="shortcuts-key">o</span></td>
@@ -5008,6 +5101,12 @@
                   if (_isDaemonMode) {
                       e.preventDefault();
                       openWorkspaceModal();
+                  }
+                  break;
+              case 'W':
+                  if (e.shiftKey) {
+                      e.preventDefault();
+                      cycleContentWidth();
                   }
                   break;
           }
