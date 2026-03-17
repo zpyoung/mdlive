@@ -1238,6 +1238,127 @@
           padding: 24px 0;
       }
 
+      .workspace-input-row {
+          display: flex;
+          gap: 8px;
+      }
+      .workspace-input-row .workspace-path-input {
+          flex: 1;
+          min-width: 0;
+      }
+      .workspace-browse-btn {
+          padding: 8px 14px;
+          font-size: 14px;
+          background: var(--code-bg);
+          color: var(--text-color);
+          border: 1px solid var(--border-color-light);
+          border-radius: 6px;
+          cursor: pointer;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          transition: background 0.15s;
+      }
+      .workspace-browse-btn:hover {
+          background: var(--border-color);
+      }
+      .workspace-browser {
+          display: none;
+          margin-top: 8px;
+          border: 1px solid var(--border-color-light);
+          border-radius: 6px;
+          background: var(--code-bg);
+          max-height: 320px;
+          overflow-y: auto;
+      }
+      .workspace-browser.show {
+          display: block;
+      }
+      .workspace-browser-bar {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 10px;
+          border-bottom: 1px solid var(--border-color);
+          font-family: var(--code-font);
+          font-size: 12px;
+          color: var(--blockquote-color);
+          position: sticky;
+          top: 0;
+          background: var(--code-bg);
+          z-index: 1;
+      }
+      .workspace-browser-up {
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: var(--link-color);
+          font-size: 14px;
+          padding: 2px 6px;
+          border-radius: 4px;
+          flex-shrink: 0;
+      }
+      .workspace-browser-up:hover {
+          background: var(--border-color);
+      }
+      .workspace-browser-path {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          direction: rtl;
+          text-align: left;
+          flex: 1;
+      }
+      .workspace-browser-path span {
+          direction: ltr;
+          unicode-bidi: bidi-override;
+      }
+      .workspace-browser-select {
+          background: none;
+          border: 1px solid var(--link-color);
+          color: var(--link-color);
+          font-size: 12px;
+          padding: 2px 10px;
+          border-radius: 4px;
+          cursor: pointer;
+          flex-shrink: 0;
+      }
+      .workspace-browser-select:hover {
+          background: var(--link-color);
+          color: var(--bg-color);
+      }
+      .workspace-browser-list {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+      }
+      .workspace-browser-item {
+          display: flex;
+          align-items: center;
+          padding: 6px 12px;
+          cursor: pointer;
+          gap: 8px;
+          font-family: var(--code-font);
+          font-size: 13px;
+          color: var(--text-color);
+          transition: background 0.1s;
+      }
+      .workspace-browser-item:hover {
+          background: var(--border-color);
+      }
+      .workspace-browser-item-icon {
+          flex-shrink: 0;
+          width: 16px;
+          text-align: center;
+          font-size: 14px;
+      }
+      .workspace-browser-item-name {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+      }
+
       .workspace-picker-page {
           display: flex;
           align-items: center;
@@ -1887,6 +2008,14 @@
       body.sidebar-collapsed .editor-container {
           margin-left: var(--sidebar-collapsed-width);
       }
+
+      .status-bar {
+          left: var(--sidebar-width);
+          transition: left var(--transition-speed) var(--transition-timing);
+      }
+      body.sidebar-collapsed .status-bar {
+          left: var(--sidebar-collapsed-width);
+      }
       {% endif %}
 
       {% if show_navigation and not editor_mode %}
@@ -1899,6 +2028,14 @@
 
       body.sidebar-collapsed .page-container {
           margin-left: var(--sidebar-collapsed-width);
+      }
+
+      .status-bar {
+          left: var(--sidebar-width);
+          transition: left var(--transition-speed) var(--transition-timing);
+      }
+      body.sidebar-collapsed .status-bar {
+          left: var(--sidebar-collapsed-width);
       }
 
       .page-container #content {
@@ -1919,6 +2056,50 @@
           .page-header .branding-logo {
               display: none;
           }
+      }
+
+      /* Status bar */
+      .page-container {
+          padding-bottom: 24px;
+      }
+      .editor-container {
+          padding-bottom: 24px;
+      }
+      .status-bar {
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          padding: 0 12px;
+          font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+          font-size: 12px;
+          background: var(--code-bg);
+          border-top: 1px solid var(--border-color);
+          color: var(--text-color);
+          opacity: 0.7;
+          z-index: 999;
+          gap: 12px;
+      }
+      .status-bar-path {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          direction: rtl;
+          text-align: left;
+      }
+      .status-bar-path span {
+          direction: ltr;
+          unicode-bidi: bidi-override;
+      }
+      .status-bar-mode {
+          flex-shrink: 0;
+          opacity: 0.6;
+      }
+      .status-bar-spacer {
+          flex: 1;
       }
     </style>
 
@@ -4193,15 +4374,24 @@
       <div class="workspace-modal-content">
         <img src="/static/mdlive.png" alt="mdlive" style="width:280px;display:block;margin:0 auto 16px" />
         <h3 style="margin:0 0 16px 0;text-align:center;color:var(--text-color)">Open Workspace</h3>
-        <input
-          type="text"
-          class="workspace-path-input"
-          id="pickerPageInput"
-          placeholder="~/dev/my-project or ~/notes/todo.md"
-          autocomplete="off"
-          spellcheck="false"
-          autofocus
-        />
+        <div class="workspace-input-row">
+          <input
+            type="text"
+            class="workspace-path-input"
+            id="pickerPageInput"
+            placeholder="~/dev/my-project or ~/notes/todo.md"
+            autocomplete="off"
+            spellcheck="false"
+            autofocus
+          />
+          <button class="workspace-browse-btn" id="pickerBrowseBtn" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+            </svg>
+            Browse
+          </button>
+        </div>
+        <div class="workspace-browser" id="pickerBrowser"></div>
         <p class="workspace-error" id="pickerPageError"></p>
         <div class="workspace-recent-heading">Recent</div>
         <ul class="workspace-recent-list" id="pickerPageRecentList"></ul>
@@ -4212,12 +4402,23 @@
           var input = document.getElementById('pickerPageInput');
           var errEl = document.getElementById('pickerPageError');
           var list = document.getElementById('pickerPageRecentList');
+          var browser = document.getElementById('pickerBrowser');
+          var browseBtn = document.getElementById('pickerBrowseBtn');
 
           input.addEventListener('keydown', function(e) {
               if (e.key === 'Enter') {
                   var val = input.value.trim();
                   if (val) doSwitch(val);
               }
+          });
+
+          browseBtn.addEventListener('click', function() {
+              if (browser.classList.contains('show')) {
+                  browser.classList.remove('show');
+                  return;
+              }
+              var startPath = input.value.trim() || '~';
+              loadBrowser(browser, startPath, input, doSwitch);
           });
 
           function doSwitch(path) {
@@ -4649,6 +4850,15 @@
     </script>
     {% endif %} {% endif %} {% endif %}
 
+    {% if base_dir %}
+    <div class="status-bar" id="statusBar">
+      <div class="status-bar-path" title="{{ base_dir }}"><span>{{ base_dir }}</span></div>
+      {% if current_file %}<div class="status-bar-mode">{{ current_file }}</div>{% endif %}
+      <div class="status-bar-spacer"></div>
+      {% if editor_mode %}<div class="status-bar-mode">EDIT</div>{% endif %}
+    </div>
+    {% endif %}
+
     <div class="theme-modal" id="themeModal">
       <div class="theme-modal-content">
         <h3>Choose Theme</h3>
@@ -4813,14 +5023,23 @@
     <div class="workspace-modal" id="workspaceModal">
       <div class="workspace-modal-content">
         <h3>Open Workspace</h3>
-        <input
-          type="text"
-          class="workspace-path-input"
-          id="workspacePathInput"
-          placeholder="~/dev/my-project or ~/notes/todo.md"
-          autocomplete="off"
-          spellcheck="false"
-        />
+        <div class="workspace-input-row">
+          <input
+            type="text"
+            class="workspace-path-input"
+            id="workspacePathInput"
+            placeholder="~/dev/my-project or ~/notes/todo.md"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button class="workspace-browse-btn" id="modalBrowseBtn" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+            </svg>
+            Browse
+          </button>
+        </div>
+        <div class="workspace-browser" id="modalBrowser"></div>
         <p class="workspace-error" id="workspaceError"></p>
         <div class="workspace-recent-heading">Recent</div>
         <ul class="workspace-recent-list" id="workspaceRecentList">
@@ -4917,6 +5136,116 @@
           div.textContent = str;
           return div.innerHTML;
       }
+
+      function loadBrowser(container, startPath, input, onSelect) {
+          container.classList.add('show');
+          container.innerHTML = '<div style="padding:12px;opacity:0.6;font-size:13px">Loading...</div>';
+          fetchBrowse(startPath);
+
+          function fetchBrowse(path) {
+              fetch('/api/workspace/browse?path=' + encodeURIComponent(path))
+                  .then(function(r) { return r.json(); })
+                  .then(function(data) {
+                      if (!data.success) {
+                          container.innerHTML = '<div style="padding:12px;color:#e74c3c;font-size:13px">' + escapeHtml(data.error || 'Error') + '</div>';
+                          return;
+                      }
+                      renderBrowser(data);
+                  })
+                  .catch(function() {
+                      container.innerHTML = '<div style="padding:12px;color:#e74c3c;font-size:13px">Network error</div>';
+                  });
+          }
+
+          function renderBrowser(data) {
+              container.innerHTML = '';
+
+              var bar = document.createElement('div');
+              bar.className = 'workspace-browser-bar';
+
+              if (data.parent) {
+                  var upBtn = document.createElement('button');
+                  upBtn.className = 'workspace-browser-up';
+                  upBtn.title = 'Parent directory';
+                  upBtn.innerHTML = '&#8593;';
+                  upBtn.onclick = function() { fetchBrowse(data.parent); };
+                  bar.appendChild(upBtn);
+              }
+
+              var pathEl = document.createElement('div');
+              pathEl.className = 'workspace-browser-path';
+              var pathSpan = document.createElement('span');
+              pathSpan.textContent = data.path;
+              pathEl.appendChild(pathSpan);
+              bar.appendChild(pathEl);
+
+              var selectBtn = document.createElement('button');
+              selectBtn.className = 'workspace-browser-select';
+              selectBtn.textContent = 'Open this folder';
+              selectBtn.onclick = function() {
+                  input.value = data.path;
+                  container.classList.remove('show');
+                  onSelect(data.path);
+              };
+              bar.appendChild(selectBtn);
+
+              container.appendChild(bar);
+
+              var ul = document.createElement('ul');
+              ul.className = 'workspace-browser-list';
+
+              if (data.entries.length === 0) {
+                  var empty = document.createElement('li');
+                  empty.style.cssText = 'padding:16px;text-align:center;opacity:0.5;font-size:13px';
+                  empty.textContent = 'Empty directory';
+                  ul.appendChild(empty);
+              }
+
+              data.entries.forEach(function(entry) {
+                  var li = document.createElement('li');
+                  li.className = 'workspace-browser-item';
+
+                  var icon = document.createElement('span');
+                  icon.className = 'workspace-browser-item-icon';
+                  icon.textContent = entry.is_dir ? '\uD83D\uDCC1' : '\uD83D\uDCC4';
+                  li.appendChild(icon);
+
+                  var name = document.createElement('span');
+                  name.className = 'workspace-browser-item-name';
+                  name.textContent = entry.name;
+                  li.appendChild(name);
+
+                  li.onclick = function() {
+                      if (entry.is_dir) {
+                          fetchBrowse(entry.path);
+                      } else {
+                          input.value = entry.path;
+                          container.classList.remove('show');
+                          onSelect(entry.path);
+                      }
+                  };
+                  ul.appendChild(li);
+              });
+
+              container.appendChild(ul);
+          }
+      }
+
+      // wire up modal browse button
+      (function() {
+          var btn = document.getElementById('modalBrowseBtn');
+          if (!btn) return;
+          var browser = document.getElementById('modalBrowser');
+          var input = document.getElementById('workspacePathInput');
+          btn.addEventListener('click', function() {
+              if (browser.classList.contains('show')) {
+                  browser.classList.remove('show');
+                  return;
+              }
+              var startPath = input.value.trim() || '~';
+              loadBrowser(browser, startPath, input, switchWorkspace);
+          });
+      })();
 
       document.addEventListener('keydown', function(e) {
           if (e.ctrlKey || e.metaKey || e.altKey) return;

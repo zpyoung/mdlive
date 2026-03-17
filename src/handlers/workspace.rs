@@ -1,4 +1,8 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::{Query, State},
+    http::StatusCode,
+    Json,
+};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio::task::AbortHandle;
@@ -205,5 +209,92 @@ pub(crate) async fn api_workspace_recent(
     Json(RecentResponse {
         success: true,
         recent,
+    })
+}
+
+#[derive(Deserialize)]
+pub(crate) struct BrowseQuery {
+    #[serde(default)]
+    path: Option<String>,
+}
+
+#[derive(Serialize)]
+pub(crate) struct BrowseEntry {
+    name: String,
+    path: String,
+    is_dir: bool,
+}
+
+#[derive(Serialize)]
+pub(crate) struct BrowseResponse {
+    success: bool,
+    path: String,
+    parent: Option<String>,
+    entries: Vec<BrowseEntry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+pub(crate) async fn api_workspace_browse(
+    Query(params): Query<BrowseQuery>,
+) -> Json<BrowseResponse> {
+    let target = params
+        .path
+        .map(|p| expand_path(&p))
+        .unwrap_or_else(|| dirs::home_dir().unwrap_or_else(|| PathBuf::from("/")));
+
+    let target = if target.is_file() {
+        target.parent().unwrap_or(&target).to_path_buf()
+    } else {
+        target
+    };
+
+    let display = target.display().to_string();
+    let parent = target.parent().map(|p| p.display().to_string());
+
+    let entries = match std::fs::read_dir(&target) {
+        Ok(rd) => {
+            let mut items: Vec<BrowseEntry> = rd
+                .filter_map(|e| e.ok())
+                .filter_map(|e| {
+                    let name = e.file_name().to_string_lossy().to_string();
+                    if name.starts_with('.') {
+                        return None;
+                    }
+                    let ft = e.file_type().ok()?;
+                    if !ft.is_dir() && !ft.is_file() {
+                        return None;
+                    }
+                    Some(BrowseEntry {
+                        path: e.path().display().to_string(),
+                        is_dir: ft.is_dir(),
+                        name,
+                    })
+                })
+                .collect();
+            items.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+            });
+            items
+        }
+        Err(e) => {
+            return Json(BrowseResponse {
+                success: false,
+                path: display,
+                parent,
+                entries: vec![],
+                error: Some(format!("cannot read directory: {e}")),
+            });
+        }
+    };
+
+    Json(BrowseResponse {
+        success: true,
+        path: display,
+        parent,
+        entries,
+        error: None,
     })
 }

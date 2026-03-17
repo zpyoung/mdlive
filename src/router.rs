@@ -93,6 +93,10 @@ fn build_routes(state: Arc<Mutex<MarkdownState>>) -> Router {
             "/api/workspace/recent",
             get(handlers::workspace::api_workspace_recent),
         )
+        .route(
+            "/api/workspace/browse",
+            get(handlers::workspace::api_workspace_browse),
+        )
         .route("/edit/*filepath", get(handlers::pages::serve_editor))
         .route("/*filepath", get(handlers::pages::serve_file))
         .layer(CorsLayer::permissive())
