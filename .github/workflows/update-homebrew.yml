@@ -91,6 +91,7 @@ jobs:
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
+        git pull --rebase
         git add Formula/mdlive.rb
         git diff --staged --quiet && exit 0
         git commit -m "mdlive ${{ steps.version.outputs.version }}"
