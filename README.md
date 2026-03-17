@@ -2,30 +2,36 @@
 
 # mdlive
 
-A lightweight markdown editor and live preview server. Point it at a file or directory, get instant rendered output in the browser with live reload. Edit, create, rename, delete -- all from the browser. Run it as a persistent daemon and switch between projects without spawning new processes.
+A lightweight markdown editor and live preview server. Point it at a file or directory, get instant rendered output with live reload. Edit, create, rename, delete -- all from the UI. Run it as a persistent daemon and switch between projects without spawning new processes.
+
+Available as a native macOS app (DMG), a CLI tool, or both.
 
 I built this to sit next to AI coding agents. When an agent writes markdown -- plans, architecture docs, research -- I'd rather read it rendered than squint at raw text in a terminal. But it works just as well as a standalone markdown workspace.
 
-This started as a fork of Jose Fernandez's [mdserve](https://github.com/jfernandez/mdserve). The original idea and initial core implementation are his. I've since taken it in a different direction: in-browser editing, file CRUD, version history, workspace switching, keyboard shortcuts, theming. Different enough to warrant its own repo.
+This started as a fork of Jose Fernandez's [mdserve](https://github.com/jfernandez/mdserve). The original idea and initial core implementation are his. I've since taken it in a different direction: in-browser editing, file CRUD, version history, workspace switching, keyboard shortcuts, theming, native desktop app. Different enough to warrant its own repo.
 
 https://github.com/bearded-giant/mdlive/raw/main/docs/images/mdlive.mp4
 
 ## Install
 
-```bash
-cargo install mdlive                          # from crates.io
-brew install bearded-giant/tap/mdlive         # homebrew (macOS / Linux)
-```
+### macOS app (recommended)
 
-Or build from source:
+Download the DMG from the [releases page](https://github.com/bearded-giant/mdlive/releases) or install via Homebrew:
 
 ```bash
-git clone https://github.com/bearded-giant/mdlive.git
-cd mdlive
-cargo build --release
+brew install --cask bearded-giant/tap/mdlive-app
 ```
 
-Single binary, no runtime dependencies. Everything (templates, JS libraries, images) is embedded at compile time. Prebuilt binaries for macOS and Linux (x86_64 + aarch64) are also available on the [releases page](https://github.com/bearded-giant/mdlive/releases).
+The app bundle includes both the native desktop app and the `mdlive` CLI. On first launch, the app will prompt for your password to symlink the CLI to `/usr/local/bin/mdlive` (or `/opt/homebrew/bin/mdlive`). This is a one-time setup so the `mdlive` command is available from your shell.
+
+### CLI only
+
+```bash
+brew install bearded-giant/tap/mdlive          # homebrew (macOS / Linux)
+cargo install mdlive                           # from crates.io
+```
+
+Or grab a prebuilt binary from the [releases page](https://github.com/bearded-giant/mdlive/releases) -- single binary, no runtime dependencies. Everything (templates, JS libraries, images) is embedded at compile time.
 
 ### Claude Code plugin
 
@@ -40,7 +46,7 @@ mdlive is available as a [Claude Code](https://docs.anthropic.com/en/docs/claude
 ```bash
 mdlive README.md         # single file, opens browser
 mdlive docs/             # directory mode with sidebar
-mdlive                   # daemon mode -- workspace picker in the browser
+mdlive                   # daemon mode -- workspace picker
 ```
 
 #### Single file view
@@ -93,9 +99,9 @@ Pass a directory and mdlive recursively finds all `.md`, `.markdown`, `.txt`, an
 
 ### Daemon mode
 
-Run `mdlive` with no arguments and it starts in daemon mode -- a single long-running process you keep around. Instead of spawning a new process per directory, you switch between projects from the browser.
+Run `mdlive` with no arguments and it starts in daemon mode -- a single long-running process you keep around. Instead of spawning a new process per directory, you switch between projects from the UI.
 
-On first launch you get a workspace picker: type a path (directories and individual files both work, `~` expansion included) or click a recent entry. Once a workspace is loaded, everything works the same as direct mode -- sidebar, tabs, editing, revisions. Hit `o` or click the folder icon in the bottom-right to switch to a different workspace without restarting.
+On first launch you get a workspace picker: type a path (directories and individual files both work, `~` expansion included), use the Browse button to navigate your filesystem, or click a recent entry. Once a workspace is loaded, everything works the same as direct mode -- sidebar, tabs, editing, revisions. Hit `o` or click the folder icon in the bottom-right to switch to a different workspace without restarting.
 
 The recent workspaces list (up to 15 entries, FIFO) is stored at `~/.config/mdlive/config.toml`. This is the only file mdlive writes outside of the directories you open.
 
@@ -113,6 +119,12 @@ mdlive service uninstall            # stop and remove
 ```
 
 The plist lives at `~/Library/LaunchAgents/com.beardedgiant.mdlive.plist`. Uninstalling removes it cleanly -- no system-level changes, nothing left behind.
+
+### Desktop app
+
+The macOS desktop app wraps the same server in a native window via [Tauri](https://tauri.app/). No browser required. It launches in daemon mode with the workspace picker, and the bundled CLI means `mdlive` works from your terminal too.
+
+The app automatically finds a free port (starting at 3000) and opens a WebKit webview. File watching, WebSocket reload, and everything else works identically to the browser experience.
 
 ### Keyboard shortcuts
 
@@ -152,13 +164,15 @@ mdlive service status         # check daemon status
 
 ## Development
 
-Rust 1.82+, 2021 edition. Templates and static assets are embedded at compile time (`minijinja-embed`, `include_str!`, `include_bytes!`), so changes to `templates/` or `static/` need a rebuild.
+Rust 1.82+, 2021 edition. The project is a Cargo workspace with two crates: `mdlive` (library + CLI) and `mdlive-app` (Tauri desktop app). Templates and static assets are embedded at compile time (`minijinja-embed`, `include_str!`, `include_bytes!`), so changes to `templates/` or `static/` need a rebuild.
 
 ```bash
-cargo build --release
+cargo build --release             # CLI binary
 cargo test                        # all tests (99 unit + integration)
 cargo test --test pages_test      # specific test file
 cargo test test_server_starts     # by name
+cargo tauri dev                   # run desktop app in dev mode
+cargo tauri build                 # produce .dmg and .app bundle
 ```
 
 See [docs/architecture.md](docs/architecture.md) for internals.
@@ -169,4 +183,4 @@ MIT. See [LICENSE](LICENSE).
 
 ## Attribution
 
-Based on [mdserve](https://github.com/jfernandez/mdserve) by Jose Fernandez, MIT licensed. Original contributors are in the git history.
+Based on [mdserve](https://github.com/jfernandez/mdserve) by Jose Fernandez, MIT licensed. Original contributors are in the git history. Desktop app built with [Tauri](https://tauri.app/).
