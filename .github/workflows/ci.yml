@@ -86,25 +86,13 @@ jobs:
         path: dist/mdlive-${{ matrix.target }}
 
   tauri-build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            os: macos-latest
-          - target: x86_64-apple-darwin
-            os: macos-latest
-
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
 
     steps:
     - uses: actions/checkout@v5
 
     - name: Report Rust version
       run: rustup show
-
-    - name: Install target
-      run: rustup target add ${{ matrix.target }}
 
     - name: Install Tauri CLI
       run: cargo install tauri-cli --version '^2'
@@ -116,22 +104,19 @@ jobs:
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-${{ matrix.target }}-tauri-${{ hashFiles('**/Cargo.lock') }}
+        key: macos-aarch64-tauri-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build CLI binary
+      run: cargo build -p mdlive --release
 
     - name: Build Tauri app
-      run: cargo tauri build --target ${{ matrix.target }}
+      run: cargo tauri build
 
     - name: Upload DMG
       uses: actions/upload-artifact@v4
       with:
-        name: mdlive-app-${{ matrix.target }}
-        path: target/${{ matrix.target }}/release/bundle/dmg/*.dmg
-
-    - name: Upload app bundle
-      uses: actions/upload-artifact@v4
-      with:
-        name: mdlive-app-bundle-${{ matrix.target }}
-        path: target/${{ matrix.target }}/release/bundle/macos/*.app
+        name: mdlive-app-dmg
+        path: target/release/bundle/dmg/*.dmg
 
   publish-crate:
     needs: test-and-build

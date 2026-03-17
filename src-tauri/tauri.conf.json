@@ -11,6 +11,7 @@
   "bundle": {
     "active": true,
     "targets": ["dmg", "app"],
+    "externalBin": ["binaries/mdlive-cli"],
     "icon": [
       "icons/icon.png",
       "icons/icon.icns"

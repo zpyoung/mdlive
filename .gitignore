@@ -1,4 +1,5 @@
 /target
 /scratch
+src-tauri/binaries/
 
 demo/.mdlive/

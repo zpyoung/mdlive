@@ -2113,6 +2113,7 @@ name = "mdlive-app"
 version = "2.0.0"
 dependencies = [
  "axum",
+ "dirs",
  "mdlive",
  "serde",
  "serde_json",

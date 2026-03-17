@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
 static SERVER_PORT: OnceLock<u16> = OnceLock::new();
@@ -43,6 +44,8 @@ pub fn run() {
 
             let _ = window;
 
+            install_cli();
+
             // keep tokio runtime alive for the lifetime of the app
             std::mem::forget(rt);
 
@@ -50,4 +53,59 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+fn install_cli() {
+    let marker = dirs::data_local_dir()
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join("com.beardedgiant.mdlive")
+        .join(".cli-installed");
+
+    if marker.exists() {
+        return;
+    }
+
+    let exe_dir = match std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+    {
+        Some(d) => d,
+        None => return,
+    };
+
+    let src = exe_dir.join("mdlive-cli");
+    if !src.exists() {
+        return;
+    }
+
+    // find writable bin dir: /opt/homebrew/bin, /usr/local/bin
+    let dest = ["/opt/homebrew/bin/mdlive", "/usr/local/bin/mdlive"]
+        .iter()
+        .find(|p| {
+            std::path::Path::new(p)
+                .parent()
+                .map(|d| d.exists())
+                .unwrap_or(false)
+        })
+        .unwrap_or(&"/usr/local/bin/mdlive");
+
+    let cmd = format!("ln -sf '{}' '{}'", src.display(), dest);
+    let script = format!(
+        "do shell script \"{}\" with administrator privileges \
+         with prompt \"mdlive wants to install the CLI command to {}\"",
+        cmd, dest
+    );
+
+    let ok = std::process::Command::new("osascript")
+        .args(["-e", &script])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+
+    if ok {
+        if let Some(parent) = marker.parent() {
+            std::fs::create_dir_all(parent).ok();
+        }
+        std::fs::write(&marker, "").ok();
+    }
 }
