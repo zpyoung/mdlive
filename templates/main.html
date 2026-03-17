@@ -196,8 +196,8 @@
       body {
           display: flex;
           max-width: none;
-          min-height: 100vh;
-          overflow-x: hidden; /* Prevent horizontal scroll during transitions */
+          height: 100vh;
+          overflow: hidden;
       }
 
       /* Sidebar */
@@ -582,7 +582,8 @@
           padding: 0;
       }
       body {
-          min-height: 100vh;
+          height: 100vh;
+          overflow: hidden;
       }
       .page-container {
           width: 75%;
@@ -1263,107 +1264,167 @@
       .workspace-browse-btn:hover {
           background: var(--border-color);
       }
-      .workspace-browser {
+      .browse-modal {
           display: none;
-          margin-top: 8px;
-          border: 1px solid var(--border-color-light);
-          border-radius: 6px;
-          background: var(--code-bg);
-          max-height: 320px;
-          overflow-y: auto;
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.5);
+          z-index: 1100;
+          backdrop-filter: blur(4px);
       }
-      .workspace-browser.show {
-          display: block;
-      }
-      .workspace-browser-bar {
+      .browse-modal.show {
           display: flex;
           align-items: center;
-          gap: 6px;
-          padding: 6px 10px;
-          border-bottom: 1px solid var(--border-color);
-          font-family: var(--code-font);
-          font-size: 12px;
-          color: var(--blockquote-color);
-          position: sticky;
-          top: 0;
-          background: var(--code-bg);
-          z-index: 1;
+          justify-content: center;
       }
-      .workspace-browser-up {
+      .browse-modal-content {
+          background: var(--bg-color);
+          border: 1px solid var(--border-color);
+          border-radius: 12px;
+          padding: 0;
+          max-width: 640px;
+          width: 90%;
+          max-height: 80vh;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+      }
+      .browse-modal-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 16px;
+          border-bottom: 1px solid var(--border-color);
+          flex-shrink: 0;
+      }
+      .browse-modal-header h3 {
+          margin: 0;
+          font-size: 16px;
+          color: var(--text-color);
+          flex: 1;
+      }
+      .browse-modal-close {
           background: none;
           border: none;
           cursor: pointer;
-          color: var(--link-color);
+          color: var(--blockquote-color);
+          font-size: 18px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          line-height: 1;
+      }
+      .browse-modal-close:hover {
+          background: var(--border-color);
+          color: var(--text-color);
+      }
+      .browse-modal-bar {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 16px;
+          border-bottom: 1px solid var(--border-color);
+          background: var(--code-bg);
+          flex-shrink: 0;
+      }
+      .browse-modal-up {
+          background: none;
+          border: 1px solid var(--border-color-light);
+          cursor: pointer;
+          color: var(--text-color);
           font-size: 14px;
-          padding: 2px 6px;
+          padding: 4px 8px;
           border-radius: 4px;
           flex-shrink: 0;
       }
-      .workspace-browser-up:hover {
+      .browse-modal-up:hover {
           background: var(--border-color);
       }
-      .workspace-browser-path {
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          direction: rtl;
-          text-align: left;
-          flex: 1;
-      }
-      .workspace-browser-path span {
-          direction: ltr;
-          unicode-bidi: bidi-override;
-      }
-      .workspace-browser-select {
-          background: none;
-          border: 1px solid var(--link-color);
-          color: var(--link-color);
-          font-size: 12px;
-          padding: 2px 10px;
+      .browse-modal-path {
+          font-family: var(--code-font);
+          font-size: 13px;
+          color: var(--text-color);
+          background: var(--bg-color);
+          border: 1px solid var(--border-color-light);
           border-radius: 4px;
-          cursor: pointer;
-          flex-shrink: 0;
+          padding: 4px 8px;
+          flex: 1;
+          min-width: 0;
+          outline: none;
       }
-      .workspace-browser-select:hover {
-          background: var(--link-color);
-          color: var(--bg-color);
+      .browse-modal-path:focus {
+          border-color: var(--link-color);
       }
-      .workspace-browser-list {
+      .browse-modal-list {
           list-style: none;
           margin: 0;
           padding: 0;
+          overflow-y: auto;
+          flex: 1;
       }
-      .workspace-browser-item {
+      .browse-modal-item {
           display: flex;
           align-items: center;
-          padding: 6px 12px;
+          padding: 8px 16px;
           cursor: pointer;
-          gap: 8px;
+          gap: 10px;
           font-family: var(--code-font);
           font-size: 13px;
           color: var(--text-color);
           transition: background 0.1s;
       }
-      .workspace-browser-item:hover {
-          background: var(--border-color);
+      .browse-modal-item:hover {
+          background: var(--code-bg);
       }
-      .workspace-browser-item-icon {
+      .browse-modal-item-icon {
           flex-shrink: 0;
-          width: 16px;
+          width: 18px;
           text-align: center;
-          font-size: 14px;
+          font-size: 15px;
       }
-      .workspace-browser-item-name {
+      .browse-modal-item-name {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+      }
+      .browse-modal-footer {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          padding: 12px 16px;
+          border-top: 1px solid var(--border-color);
+          flex-shrink: 0;
+      }
+      .browse-modal-btn {
+          padding: 6px 16px;
+          font-size: 13px;
+          border-radius: 6px;
+          cursor: pointer;
+          border: 1px solid var(--border-color-light);
+          background: var(--code-bg);
+          color: var(--text-color);
+      }
+      .browse-modal-btn:hover {
+          background: var(--border-color);
+      }
+      .browse-modal-btn-primary {
+          background: var(--link-color);
+          color: #fff;
+          border-color: var(--link-color);
+      }
+      .browse-modal-btn-primary:hover {
+          opacity: 0.9;
       }
 
       .workspace-picker-page {
           display: flex;
           align-items: center;
           justify-content: center;
-          min-height: 100vh;
+          height: 100vh;
+          overflow-y: auto;
       }
 
       .workspace-picker-page .workspace-modal-content {
@@ -1523,7 +1584,8 @@
       .page-container {
           display: flex;
           flex-direction: column;
-          min-height: 100vh;
+          height: 100vh;
+          overflow-y: auto;
       }
 
       .page-container #content {
@@ -4391,7 +4453,6 @@
             Browse
           </button>
         </div>
-        <div class="workspace-browser" id="pickerBrowser"></div>
         <p class="workspace-error" id="pickerPageError"></p>
         <div class="workspace-recent-heading">Recent</div>
         <ul class="workspace-recent-list" id="pickerPageRecentList"></ul>
@@ -4402,7 +4463,6 @@
           var input = document.getElementById('pickerPageInput');
           var errEl = document.getElementById('pickerPageError');
           var list = document.getElementById('pickerPageRecentList');
-          var browser = document.getElementById('pickerBrowser');
           var browseBtn = document.getElementById('pickerBrowseBtn');
 
           input.addEventListener('keydown', function(e) {
@@ -4413,12 +4473,11 @@
           });
 
           browseBtn.addEventListener('click', function() {
-              if (browser.classList.contains('show')) {
-                  browser.classList.remove('show');
-                  return;
-              }
               var startPath = input.value.trim() || '~';
-              loadBrowser(browser, startPath, input, doSwitch);
+              openBrowseModal(startPath, function(path) {
+                  input.value = path;
+                  doSwitch(path);
+              });
           });
 
           function doSwitch(path) {
@@ -4859,6 +4918,24 @@
     </div>
     {% endif %}
 
+    <div class="browse-modal" id="browseModal" onclick="if(event.target===this)closeBrowseModal()">
+      <div class="browse-modal-content">
+        <div class="browse-modal-header">
+          <h3>Browse</h3>
+          <button class="browse-modal-close" onclick="closeBrowseModal()" title="Close">&times;</button>
+        </div>
+        <div class="browse-modal-bar">
+          <button class="browse-modal-up" id="browseUp" title="Parent directory">&#8593;</button>
+          <input type="text" class="browse-modal-path" id="browsePath" spellcheck="false" autocomplete="off" />
+        </div>
+        <ul class="browse-modal-list" id="browseList"></ul>
+        <div class="browse-modal-footer">
+          <button class="browse-modal-btn" onclick="closeBrowseModal()">Cancel</button>
+          <button class="browse-modal-btn browse-modal-btn-primary" onclick="browseSelectCurrent()">Open this folder</button>
+        </div>
+      </div>
+    </div>
+
     <div class="theme-modal" id="themeModal">
       <div class="theme-modal-content">
         <h3>Choose Theme</h3>
@@ -5039,7 +5116,6 @@
             Browse
           </button>
         </div>
-        <div class="workspace-browser" id="modalBrowser"></div>
         <p class="workspace-error" id="workspaceError"></p>
         <div class="workspace-recent-heading">Recent</div>
         <ul class="workspace-recent-list" id="workspaceRecentList">
@@ -5137,113 +5213,104 @@
           return div.innerHTML;
       }
 
-      function loadBrowser(container, startPath, input, onSelect) {
-          container.classList.add('show');
-          container.innerHTML = '<div style="padding:12px;opacity:0.6;font-size:13px">Loading...</div>';
-          fetchBrowse(startPath);
+      var _browseCallback = null;
+      var _browseCurrentPath = '';
 
-          function fetchBrowse(path) {
-              fetch('/api/workspace/browse?path=' + encodeURIComponent(path))
-                  .then(function(r) { return r.json(); })
-                  .then(function(data) {
-                      if (!data.success) {
-                          container.innerHTML = '<div style="padding:12px;color:#e74c3c;font-size:13px">' + escapeHtml(data.error || 'Error') + '</div>';
-                          return;
-                      }
-                      renderBrowser(data);
-                  })
-                  .catch(function() {
-                      container.innerHTML = '<div style="padding:12px;color:#e74c3c;font-size:13px">Network error</div>';
-                  });
-          }
-
-          function renderBrowser(data) {
-              container.innerHTML = '';
-
-              var bar = document.createElement('div');
-              bar.className = 'workspace-browser-bar';
-
-              if (data.parent) {
-                  var upBtn = document.createElement('button');
-                  upBtn.className = 'workspace-browser-up';
-                  upBtn.title = 'Parent directory';
-                  upBtn.innerHTML = '&#8593;';
-                  upBtn.onclick = function() { fetchBrowse(data.parent); };
-                  bar.appendChild(upBtn);
-              }
-
-              var pathEl = document.createElement('div');
-              pathEl.className = 'workspace-browser-path';
-              var pathSpan = document.createElement('span');
-              pathSpan.textContent = data.path;
-              pathEl.appendChild(pathSpan);
-              bar.appendChild(pathEl);
-
-              var selectBtn = document.createElement('button');
-              selectBtn.className = 'workspace-browser-select';
-              selectBtn.textContent = 'Open this folder';
-              selectBtn.onclick = function() {
-                  input.value = data.path;
-                  container.classList.remove('show');
-                  onSelect(data.path);
-              };
-              bar.appendChild(selectBtn);
-
-              container.appendChild(bar);
-
-              var ul = document.createElement('ul');
-              ul.className = 'workspace-browser-list';
-
-              if (data.entries.length === 0) {
-                  var empty = document.createElement('li');
-                  empty.style.cssText = 'padding:16px;text-align:center;opacity:0.5;font-size:13px';
-                  empty.textContent = 'Empty directory';
-                  ul.appendChild(empty);
-              }
-
-              data.entries.forEach(function(entry) {
-                  var li = document.createElement('li');
-                  li.className = 'workspace-browser-item';
-
-                  var icon = document.createElement('span');
-                  icon.className = 'workspace-browser-item-icon';
-                  icon.textContent = entry.is_dir ? '\uD83D\uDCC1' : '\uD83D\uDCC4';
-                  li.appendChild(icon);
-
-                  var name = document.createElement('span');
-                  name.className = 'workspace-browser-item-name';
-                  name.textContent = entry.name;
-                  li.appendChild(name);
-
-                  li.onclick = function() {
-                      if (entry.is_dir) {
-                          fetchBrowse(entry.path);
-                      } else {
-                          input.value = entry.path;
-                          container.classList.remove('show');
-                          onSelect(entry.path);
-                      }
-                  };
-                  ul.appendChild(li);
+      function openBrowseModal(startPath, onSelect) {
+          _browseCallback = onSelect;
+          var modal = document.getElementById('browseModal');
+          modal.classList.add('show');
+          var pathInput = document.getElementById('browsePath');
+          if (!pathInput._bound) {
+              pathInput._bound = true;
+              pathInput.addEventListener('keydown', function(e) {
+                  if (e.key === 'Enter') {
+                      e.preventDefault();
+                      var val = pathInput.value.trim();
+                      if (val) browseTo(val);
+                  }
+                  if (e.key === 'Escape') {
+                      e.stopPropagation();
+                      closeBrowseModal();
+                  }
               });
-
-              container.appendChild(ul);
           }
+          browseTo(startPath);
       }
 
-      // wire up modal browse button
+      function closeBrowseModal() {
+          var modal = document.getElementById('browseModal');
+          modal.classList.remove('show');
+          _browseCallback = null;
+      }
+
+      function browseTo(path) {
+          var listEl = document.getElementById('browseList');
+          var pathInput = document.getElementById('browsePath');
+          var upBtn = document.getElementById('browseUp');
+
+          listEl.innerHTML = '<li style="padding:16px;text-align:center;opacity:0.5;font-size:13px">Loading...</li>';
+
+          fetch('/api/workspace/browse?path=' + encodeURIComponent(path))
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                  if (!data.success) {
+                      listEl.innerHTML = '<li style="padding:16px;color:#e74c3c;font-size:13px">' + escapeHtml(data.error || 'Error') + '</li>';
+                      return;
+                  }
+                  _browseCurrentPath = data.path;
+                  pathInput.value = data.path;
+
+                  upBtn.disabled = !data.parent;
+                  upBtn.onclick = data.parent ? function() { browseTo(data.parent); } : null;
+
+                  listEl.innerHTML = '';
+                  if (data.entries.length === 0) {
+                      listEl.innerHTML = '<li style="padding:16px;text-align:center;opacity:0.5;font-size:13px">Empty directory</li>';
+                  }
+                  data.entries.forEach(function(entry) {
+                      var li = document.createElement('li');
+                      li.className = 'browse-modal-item';
+                      var icon = document.createElement('span');
+                      icon.className = 'browse-modal-item-icon';
+                      icon.textContent = entry.is_dir ? '\uD83D\uDCC1' : '\uD83D\uDCC4';
+                      li.appendChild(icon);
+                      var name = document.createElement('span');
+                      name.className = 'browse-modal-item-name';
+                      name.textContent = entry.name;
+                      li.appendChild(name);
+                      li.onclick = function() {
+                          if (entry.is_dir) {
+                              browseTo(entry.path);
+                          } else {
+                              closeBrowseModal();
+                              if (_browseCallback) _browseCallback(entry.path);
+                          }
+                      };
+                      listEl.appendChild(li);
+                  });
+              })
+              .catch(function() {
+                  listEl.innerHTML = '<li style="padding:16px;color:#e74c3c;font-size:13px">Network error</li>';
+              });
+      }
+
+      function browseSelectCurrent() {
+          closeBrowseModal();
+          if (_browseCallback && _browseCurrentPath) _browseCallback(_browseCurrentPath);
+      }
+
+      // wire up modal browse button (daemon workspace switcher)
       (function() {
           var btn = document.getElementById('modalBrowseBtn');
           if (!btn) return;
-          var browser = document.getElementById('modalBrowser');
           var input = document.getElementById('workspacePathInput');
           btn.addEventListener('click', function() {
-              if (browser.classList.contains('show')) {
-                  browser.classList.remove('show');
-                  return;
-              }
               var startPath = input.value.trim() || '~';
-              loadBrowser(browser, startPath, input, switchWorkspace);
+              openBrowseModal(startPath, function(path) {
+                  input.value = path;
+                  switchWorkspace(path);
+              });
           });
       })();
 
@@ -5270,6 +5337,12 @@
           var aboutModal = document.getElementById('aboutModal');
           if (aboutModal && aboutModal.classList.contains('show')) {
               if (e.key === 'Escape') closeAboutModal();
+              return;
+          }
+
+          var browseModal = document.getElementById('browseModal');
+          if (browseModal && browseModal.classList.contains('show')) {
+              if (e.key === 'Escape') closeBrowseModal();
               return;
           }
 

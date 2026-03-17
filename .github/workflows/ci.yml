@@ -63,16 +63,16 @@ jobs:
         key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Check formatting
-      run: cargo fmt --check
+      run: cargo fmt -p mdlive --check
 
     - name: Run clippy
-      run: cargo clippy --all-targets --all-features --target ${{ matrix.target }} -- -D warnings
+      run: cargo clippy -p mdlive --all-targets --all-features --target ${{ matrix.target }} -- -D warnings
 
     - name: Run tests
-      run: cargo test --target ${{ matrix.target }}
+      run: cargo test -p mdlive --target ${{ matrix.target }}
 
     - name: Build release
-      run: cargo build --release --target ${{ matrix.target }}
+      run: cargo build -p mdlive --release --target ${{ matrix.target }}
 
     - name: Prepare artifact
       run: |
@@ -84,6 +84,54 @@ jobs:
       with:
         name: mdlive-${{ matrix.target }}
         path: dist/mdlive-${{ matrix.target }}
+
+  tauri-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Report Rust version
+      run: rustup show
+
+    - name: Install target
+      run: rustup target add ${{ matrix.target }}
+
+    - name: Install Tauri CLI
+      run: cargo install tauri-cli --version '^2'
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ matrix.target }}-tauri-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build Tauri app
+      run: cargo tauri build --target ${{ matrix.target }}
+
+    - name: Upload DMG
+      uses: actions/upload-artifact@v4
+      with:
+        name: mdlive-app-${{ matrix.target }}
+        path: target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+
+    - name: Upload app bundle
+      uses: actions/upload-artifact@v4
+      with:
+        name: mdlive-app-bundle-${{ matrix.target }}
+        path: target/${{ matrix.target }}/release/bundle/macos/*.app
 
   publish-crate:
     needs: test-and-build
@@ -108,10 +156,10 @@ jobs:
     - name: Publish to crates.io
       env:
         CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-      run: cargo publish
+      run: cargo publish -p mdlive
 
   release:
-    needs: test-and-build
+    needs: [test-and-build, tauri-build]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
 
@@ -126,7 +174,7 @@ jobs:
     - name: Create Release and Upload Artifacts
       uses: ncipollo/release-action@v1
       with:
-        artifacts: artifacts/mdlive-*
+        artifacts: artifacts/**/*
         draft: true
         allowUpdates: true
         updateOnlyUnreleased: true

@@ -89,7 +89,10 @@ pub async fn serve_daemon(hostname: impl AsRef<str>, port: u16, open: bool) -> R
 
 const MAX_PORT_ATTEMPTS: u16 = 100;
 
-async fn bind_with_port_increment(hostname: &str, start_port: u16) -> Result<(TcpListener, u16)> {
+pub async fn bind_with_port_increment(
+    hostname: &str,
+    start_port: u16,
+) -> Result<(TcpListener, u16)> {
     let mut port = start_port;
     loop {
         match TcpListener::bind((hostname, port)).await {

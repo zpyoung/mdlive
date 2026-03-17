@@ -1,0 +1,27 @@
+[package]
+name = "mdlive-app"
+version = "2.0.0"
+edition = "2021"
+rust-version = "1.82.0"
+license = "MIT"
+description = "mdlive desktop app"
+
+[dependencies]
+mdlive = { path = ".." }
+tauri = { version = "2", features = ["devtools"] }
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros", "net"] }
+axum = "0.7.9"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[[bin]]
+name = "mdlive"
+path = "src/main.rs"
+
+[lib]
+name = "mdlive_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+path = "src/lib.rs"
