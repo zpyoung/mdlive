@@ -1,6 +1,7 @@
 use axum::{
     extract::{Query, State},
     http::StatusCode,
+    response::Redirect,
     Json,
 };
 use serde::{Deserialize, Serialize};
@@ -297,4 +298,53 @@ pub(crate) async fn api_workspace_browse(
         entries,
         error: None,
     })
+}
+
+#[derive(Deserialize)]
+pub(crate) struct OpenQuery {
+    path: String,
+}
+
+pub(crate) async fn open_and_redirect(
+    Query(params): Query<OpenQuery>,
+    State(state): State<SharedMarkdownState>,
+) -> Redirect {
+    let target = expand_path(&params.path);
+
+    let result = if target.is_file() {
+        let base = target
+            .parent()
+            .unwrap_or(std::path::Path::new("."))
+            .to_path_buf();
+        let base = base.canonicalize().unwrap_or(base);
+        Some((base, vec![target], false))
+    } else if target.is_dir() {
+        let target_canon = target.canonicalize().unwrap_or(target);
+        scan_supported_files(&target_canon).ok().and_then(|files| {
+            if files.is_empty() {
+                None
+            } else {
+                Some((target_canon, files, true))
+            }
+        })
+    } else {
+        None
+    };
+
+    if let Some((base_dir, files, dir_mode)) = result {
+        let switch_ok = {
+            let mut guard = state.lock().await;
+            guard
+                .switch_workspace(base_dir.clone(), files, dir_mode)
+                .is_ok()
+        };
+        if switch_ok {
+            if let Ok(abort_handle) = start_watcher(&base_dir, state.clone()) {
+                let mut guard = state.lock().await;
+                guard.watcher_abort = Some(abort_handle);
+            }
+        }
+    }
+
+    Redirect::to("/")
 }

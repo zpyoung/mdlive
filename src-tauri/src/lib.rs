@@ -1,8 +1,9 @@
+use std::io::{Read as _, Write as _};
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use mdlive::AppConfig;
-use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
+use tauri::menu::{AboutMetadata, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
 use tauri::Manager;
 
 static SERVER_PORT: OnceLock<u16> = OnceLock::new();
@@ -26,16 +27,33 @@ fn get_server_url() -> String {
     format!("http://127.0.0.1:{port}")
 }
 
-fn switch_workspace(window: &tauri::WebviewWindow, path: &str) {
-    let escaped = path.replace('\\', "\\\\").replace('\'', "\\'");
-    let js = format!(
-        "function __sw(){{fetch('/api/workspace/switch',\
-         {{method:'POST',headers:{{'Content-Type':'application/json'}},\
-         body:JSON.stringify({{path:'{escaped}'}})}}).then(function(){{window.location.href='/'}});}}\
-         if(document.readyState==='complete')__sw();\
-         else window.addEventListener('load',__sw);"
+// switch workspace via direct HTTP to our own server -- no webview dependency
+fn switch_workspace_http(path: &str) {
+    let port = SERVER_PORT.get().copied().unwrap_or(3000);
+    let body = format!("{{\"path\":\"{}\"}}", path.replace('\\', "\\\\").replace('"', "\\\""));
+    let request = format!(
+        "POST /api/workspace/switch HTTP/1.1\r\n\
+         Host: 127.0.0.1:{port}\r\n\
+         Content-Type: application/json\r\n\
+         Content-Length: {}\r\n\
+         Connection: close\r\n\
+         \r\n\
+         {body}",
+        body.len()
     );
-    let _ = window.eval(&js);
+    if let Ok(mut stream) = std::net::TcpStream::connect(format!("127.0.0.1:{port}")) {
+        let _ = stream.write_all(request.as_bytes());
+        let _ = stream.flush();
+        let mut buf = [0u8; 512];
+        let _ = stream.read(&mut buf);
+    }
+}
+
+fn switch_workspace(window: &tauri::WebviewWindow, path: &str) {
+    switch_workspace_http(path);
+    // webview will auto-redirect via WebSocket WorkspaceChanged message,
+    // but also try eval as a fallback for the already-loaded case
+    let _ = window.eval("window.location.href='/'");
 }
 
 fn home_prefix() -> String {
@@ -106,8 +124,18 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
 
     let recent_menu = recent_builder.build()?;
 
+    let check_update = MenuItemBuilder::new("Check for Updates...")
+        .id("check_update")
+        .build(app)?;
+
     let app_menu = SubmenuBuilder::new(app, "mdlive")
-        .about(None)
+        .about(Some(AboutMetadata {
+            version: Some(env!("CARGO_PKG_VERSION").into()),
+            website: Some("https://github.com/bearded-giant/mdlive".into()),
+            website_label: Some("GitHub".into()),
+            ..Default::default()
+        }))
+        .item(&check_update)
         .separator()
         .services()
         .separator()
@@ -215,6 +243,8 @@ pub fn run() {
                     let mut config = AppConfig::load();
                     config.recent.clear();
                     let _ = config.save();
+                } else if id == "check_update" {
+                    std::thread::spawn(check_for_updates);
                 }
             });
 
@@ -232,14 +262,90 @@ pub fn run() {
                 for url in urls {
                     if url.scheme() == "file" {
                         if let Ok(path) = url.to_file_path() {
+                            let path_str = path.display().to_string();
+                            // switch via HTTP first -- works regardless of webview state
+                            switch_workspace_http(&path_str);
+                            // then try to navigate the webview as well
                             if let Some(window) = app_handle.get_webview_window("main") {
-                                switch_workspace(&window, &path.display().to_string());
+                                let _ = window.eval("window.location.href='/'");
                             }
                         }
                     }
                 }
             }
         });
+}
+
+fn parse_version(v: &str) -> (u32, u32, u32) {
+    let parts: Vec<u32> = v.split('.').filter_map(|p| p.parse().ok()).collect();
+    (
+        parts.first().copied().unwrap_or(0),
+        parts.get(1).copied().unwrap_or(0),
+        parts.get(2).copied().unwrap_or(0),
+    )
+}
+
+fn check_for_updates() {
+    let current = env!("CARGO_PKG_VERSION");
+
+    let output = match std::process::Command::new("curl")
+        .args([
+            "-s",
+            "-H",
+            "User-Agent: mdlive-update-check",
+            "https://api.github.com/repos/bearded-giant/mdlive/releases/latest",
+        ])
+        .output()
+    {
+        Ok(o) if o.status.success() => o,
+        _ => {
+            rfd::MessageDialog::new()
+                .set_title("Update Check")
+                .set_description("Could not reach GitHub.")
+                .set_level(rfd::MessageLevel::Error)
+                .show();
+            return;
+        }
+    };
+
+    let json: serde_json::Value = match serde_json::from_slice(&output.stdout) {
+        Ok(v) => v,
+        Err(_) => {
+            rfd::MessageDialog::new()
+                .set_title("Update Check")
+                .set_description("Could not parse response.")
+                .set_level(rfd::MessageLevel::Error)
+                .show();
+            return;
+        }
+    };
+
+    let latest_tag = json["tag_name"].as_str().unwrap_or("");
+    let latest = latest_tag.strip_prefix('v').unwrap_or(latest_tag);
+
+    if parse_version(latest) > parse_version(current) {
+        let release_url = json["html_url"].as_str().unwrap_or("").to_string();
+        let result = rfd::MessageDialog::new()
+            .set_title("Update Available")
+            .set_description(&format!(
+                "v{latest} is available (you have v{current}).\n\n\
+                 Update with:\n  brew upgrade --cask bearded-giant/tap/mdlive-app"
+            ))
+            .set_level(rfd::MessageLevel::Info)
+            .set_buttons(rfd::MessageButtons::OkCancel)
+            .show();
+        if result == rfd::MessageDialogResult::Ok && !release_url.is_empty() {
+            let _ = std::process::Command::new("open").arg(&release_url).spawn();
+        }
+    } else {
+        rfd::MessageDialog::new()
+            .set_title("Up to Date")
+            .set_description(&format!(
+                "You're running the latest version (v{current})."
+            ))
+            .set_level(rfd::MessageLevel::Info)
+            .show();
+    }
 }
 
 fn install_cli() {
