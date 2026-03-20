@@ -55,7 +55,7 @@ pub(crate) async fn serve_file(
         let mut state = state.lock().await;
 
         if !state.tracked_files.contains_key(&filepath) {
-            return (StatusCode::NOT_FOUND, Html("File not found".to_string())).into_response();
+            return render_not_found(&state, &filepath).into_response();
         }
 
         let _ = state.refresh_file(&filepath);
@@ -65,7 +65,8 @@ pub(crate) async fn serve_file(
     } else if is_image_file(&filepath) {
         serve_static_file_inner(filepath, state).await
     } else {
-        (StatusCode::NOT_FOUND, Html("File not found".to_string())).into_response()
+        let state = state.lock().await;
+        render_not_found(&state, &filepath).into_response()
     }
 }
 
@@ -203,7 +204,7 @@ pub(crate) async fn serve_editor(
     let state = state.lock().await;
 
     if !state.tracked_files.contains_key(&filepath) {
-        return (StatusCode::NOT_FOUND, Html("File not found".to_string()));
+        return render_not_found(&state, &filepath);
     }
 
     let tracked = &state.tracked_files[&filepath];
@@ -313,4 +314,59 @@ fn render_editor(
     };
 
     (StatusCode::OK, Html(rendered))
+}
+
+fn render_not_found(state: &MarkdownState, path: &str) -> (StatusCode, Html<String>) {
+    let env = template_env();
+    let template = match env.get_template(TEMPLATE_NAME) {
+        Ok(t) => t,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Html(format!("Template error: {e}")),
+            );
+        }
+    };
+
+    let escaped = path
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;");
+    let content = Value::from_safe_string(format!(
+        "<div class=\"not-found-page\"><h2>Page not found</h2>\
+         <p><code>{escaped}</code> doesn't exist or isn't tracked.</p>\
+         <a href=\"/\">Back to home</a></div>"
+    ));
+
+    let rendered = if state.show_navigation() {
+        let file_infos = state.get_file_infos();
+        let tree = build_file_tree(&file_infos);
+        template.render(context! {
+            content => content,
+            file_type => "markdown",
+            show_navigation => true,
+            tree => tree,
+            current_file => "",
+            base_dir => state.base_dir.display().to_string(),
+            daemon_mode => state.daemon_mode,
+        })
+    } else {
+        template.render(context! {
+            content => content,
+            file_type => "markdown",
+            show_navigation => false,
+            current_file => "",
+            base_dir => state.base_dir.display().to_string(),
+            daemon_mode => state.daemon_mode,
+        })
+    };
+
+    match rendered {
+        Ok(r) => (StatusCode::NOT_FOUND, Html(r)),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Html(format!("Rendering error: {e}")),
+        ),
+    }
 }

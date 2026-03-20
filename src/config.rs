@@ -3,21 +3,21 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-const MAX_RECENT: usize = 15;
+const MAX_RECENT: usize = 25;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub(crate) struct RecentWorkspace {
-    pub(crate) path: String,
-    pub(crate) mode: String,
-    pub(crate) last_opened: u64,
+pub struct RecentWorkspace {
+    pub path: String,
+    pub mode: String,
+    pub last_opened: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppConfig {
     #[serde(skip)]
-    pub(crate) file_path: PathBuf,
+    pub file_path: PathBuf,
     #[serde(default)]
-    pub(crate) recent: Vec<RecentWorkspace>,
+    pub recent: Vec<RecentWorkspace>,
 }
 
 impl Default for AppConfig {
@@ -30,7 +30,7 @@ impl Default for AppConfig {
 }
 
 impl AppConfig {
-    pub(crate) fn load() -> Self {
+    pub fn load() -> Self {
         Self::load_from(default_config_path())
     }
 
@@ -44,7 +44,7 @@ impl AppConfig {
         config
     }
 
-    pub(crate) fn save(&self) -> Result<()> {
+    pub fn save(&self) -> Result<()> {
         if let Some(parent) = self.file_path.parent() {
             fs::create_dir_all(parent)?;
         }
@@ -53,7 +53,7 @@ impl AppConfig {
         Ok(())
     }
 
-    pub(crate) fn add_recent(&mut self, path: String, mode: String) {
+    pub fn add_recent(&mut self, path: String, mode: String) {
         self.recent.retain(|r| r.path != path);
 
         let now = std::time::SystemTime::now()
@@ -111,13 +111,13 @@ mod tests {
     }
 
     #[test]
-    fn test_add_recent_fifo_max_15() {
+    fn test_add_recent_fifo_max() {
         let mut config = AppConfig::default();
-        for i in 0..20 {
+        for i in 0..30 {
             config.add_recent(format!("/tmp/dir{i}"), "directory".into());
         }
         assert_eq!(config.recent.len(), MAX_RECENT);
-        assert_eq!(config.recent[0].path, "/tmp/dir19");
+        assert_eq!(config.recent[0].path, "/tmp/dir29");
         assert_eq!(config.recent[MAX_RECENT - 1].path, "/tmp/dir5");
     }
 

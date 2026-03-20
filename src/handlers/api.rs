@@ -41,6 +41,11 @@ pub(crate) struct SaveFileRequest {
 }
 
 #[derive(Deserialize)]
+pub(crate) struct CreateDirectoryRequest {
+    path: String,
+}
+
+#[derive(Deserialize)]
 pub(crate) struct FileHistoryQuery {
     path: String,
 }
@@ -630,4 +635,55 @@ pub(crate) async fn api_delete_history_entry(
         error: None,
         path: None,
     }))
+}
+
+pub(crate) async fn api_create_directory(
+    State(state): State<SharedMarkdownState>,
+    Json(body): Json<CreateDirectoryRequest>,
+) -> Result<(StatusCode, Json<ApiResponse>), (StatusCode, Json<ApiResponse>)> {
+    let state = state.lock().await;
+
+    if body.path.contains("..") {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse {
+                success: false,
+                error: Some("path traversal not allowed".to_string()),
+                path: None,
+            }),
+        ));
+    }
+
+    let target = state.base_dir.join(&body.path);
+
+    if target.exists() {
+        return Err((
+            StatusCode::CONFLICT,
+            Json(ApiResponse {
+                success: false,
+                error: Some("already exists".to_string()),
+                path: None,
+            }),
+        ));
+    }
+
+    fs::create_dir_all(&target).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse {
+                success: false,
+                error: Some(format!("failed to create directory: {e}")),
+                path: None,
+            }),
+        )
+    })?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(ApiResponse {
+            success: true,
+            error: None,
+            path: Some(body.path),
+        }),
+    ))
 }

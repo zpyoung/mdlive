@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use tokio::net::TcpListener;
 
 pub use config::AppConfig;
+pub use config::RecentWorkspace;
 pub use router::new_daemon_router;
 pub use router::new_daemon_router_with_config;
 pub use router::new_router;

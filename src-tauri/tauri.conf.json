@@ -16,6 +16,23 @@
       "icons/icon.png",
       "icons/icon.icns"
     ],
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown"],
+        "mimeType": "text/markdown",
+        "role": "Editor"
+      },
+      {
+        "ext": ["txt"],
+        "mimeType": "text/plain",
+        "role": "Editor"
+      },
+      {
+        "ext": ["json"],
+        "mimeType": "application/json",
+        "role": "Editor"
+      }
+    ],
     "macOS": {
       "minimumSystemVersion": "10.15"
     }

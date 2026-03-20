@@ -1638,6 +1638,22 @@
           white-space: nowrap;
       }
 
+      .not-found-page {
+          text-align: center;
+          padding: 80px 20px;
+      }
+      .not-found-page h2 {
+          margin: 0 0 8px;
+          font-size: 24px;
+      }
+      .not-found-page p {
+          opacity: 0.6;
+          margin: 0 0 24px;
+      }
+      .not-found-page a {
+          color: var(--link-color);
+      }
+
       .editor-spacer {
           flex: 1;
       }
@@ -2500,8 +2516,8 @@
         var epoch = parseInt(el.getAttribute('data-epoch'), 10);
         if (!epoch) return;
         var d = new Date(epoch * 1000);
-        el.textContent = formatRelativeTime(epoch);
-        el.title = d.toLocaleString();
+        el.textContent = 'Modified ' + formatRelativeTime(epoch);
+        el.title = 'Last modified: ' + d.toLocaleString();
       }
 
       // copy button on fenced code blocks
@@ -2722,12 +2738,17 @@
             newBtn.onclick = function () {
               addNewFile(dirPath);
             };
+            var newDirBtn = createMenuItem("New directory here", false);
+            newDirBtn.onclick = function () {
+              addNewDirectory(dirPath);
+            };
             var deleteBtn = createMenuItem("Delete file", true);
             deleteBtn.onclick = function () {
               deleteFile(path);
             };
             menu.appendChild(moveBtn);
             menu.appendChild(newBtn);
+            menu.appendChild(newDirBtn);
             menu.appendChild(deleteBtn);
           }
         } else {
@@ -2735,7 +2756,12 @@
           newBtn.onclick = function () {
             addNewFile(path);
           };
+          var newDirBtn = createMenuItem("New directory", false);
+          newDirBtn.onclick = function () {
+            addNewDirectory(path);
+          };
           menu.appendChild(newBtn);
+          menu.appendChild(newDirBtn);
         }
 
         menu.classList.add("show");
@@ -2851,6 +2877,30 @@
       function addNewFile(dirPath) {
         hideContextMenu();
         window.location.href = "/new?dir=" + encodeURIComponent(dirPath || "");
+      }
+
+      function addNewDirectory(parentDir) {
+        hideContextMenu();
+        openFileDialog('New directory', '', 'Enter directory name', function(dirName) {
+          var fullPath = parentDir ? parentDir + '/' + dirName : dirName;
+          fetch('/api/create_directory', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: fullPath })
+          })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (!data.success) {
+              showFileDialogError(data.error || 'unknown error');
+              return;
+            }
+            closeFileDialog();
+            window.location.href = '/new?dir=' + encodeURIComponent(fullPath);
+          })
+          .catch(function(err) {
+            showFileDialogError(err.message);
+          });
+        });
       }
 
       var _fileDialogCallback = null;
@@ -3287,7 +3337,13 @@
 
             if (path === currentPath) {
                 if (tabs.length === 0) {
-                    window.location.href = '/';
+                    currentPath = '';
+                    var container = document.querySelector('.editor-container') || document.querySelector('.page-container');
+                    if (container) container.style.display = 'none';
+                    document.querySelectorAll('.status-bar-mode').forEach(function(el) { el.style.display = 'none'; });
+                    history.replaceState(null, '', '/');
+                    document.title = 'mdlive';
+                    render();
                     return;
                 }
                 var nextIdx = Math.min(idx, tabs.length - 1);
@@ -3932,8 +3988,8 @@
                   var fmts = document.querySelector('.file-modified-ts');
                   if (fmts) {
                       fmts.setAttribute('data-epoch', nowEpoch);
-                      fmts.textContent = formatRelativeTime(nowEpoch);
-                      fmts.title = new Date(nowEpoch * 1000).toLocaleString();
+                      fmts.textContent = 'Modified ' + formatRelativeTime(nowEpoch);
+                      fmts.title = 'Last modified: ' + new Date(nowEpoch * 1000).toLocaleString();
                   }
 
                   // if new file, redirect to edit existing
@@ -4574,9 +4630,6 @@
         </span>
         {% endif %} {% endif %}
         <div class="editor-spacer"></div>
-        {% if file_modified %}
-        <span class="file-modified-ts" data-epoch="{{ file_modified }}"></span>
-        {% endif %}
         {% if has_history and current_file %}
         <button class="editor-btn" onclick="toggleHistory()">Revisions</button>
         {% endif %}
