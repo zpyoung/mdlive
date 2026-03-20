@@ -35,6 +35,20 @@ jobs:
           echo "${key}=${sha}" >> "$GITHUB_OUTPUT"
         done
 
+    - name: Download DMG and compute checksum
+      id: dmg
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VERSION: ${{ steps.version.outputs.version }}
+      run: |
+        DMG_NAME="mdlive_${VERSION}_aarch64.dmg"
+        gh release download "$TAG" \
+          --repo bearded-giant/mdlive \
+          --pattern "$DMG_NAME" \
+          --dir .
+        sha=$(sha256sum "$DMG_NAME" | cut -d' ' -f1)
+        echo "sha_dmg=${sha}" >> "$GITHUB_OUTPUT"
+
     - name: Checkout tap repo
       uses: actions/checkout@v5
       with:
@@ -87,11 +101,38 @@ jobs:
         end
         EOF
 
+    - name: Update cask
+      env:
+        VERSION: ${{ steps.version.outputs.version }}
+        SHA_DMG: ${{ steps.dmg.outputs.sha_dmg }}
+      run: |
+        mkdir -p Casks
+        cat > Casks/mdlive-app.rb << 'CASK'
+        cask "mdlive-app" do
+          version "VPLACEHOLDER"
+          sha256 "SHAPLACEHOLDER"
+
+          url "https://github.com/bearded-giant/mdlive/releases/download/v#{version}/mdlive_#{version}_aarch64.dmg"
+          name "mdlive"
+          desc "Markdown workspace server for AI coding agents"
+          homepage "https://github.com/bearded-giant/mdlive"
+
+          app "mdlive.app"
+
+          zap trash: [
+            "~/Library/Application Support/com.beardedgiant.mdlive",
+            "~/.config/mdlive",
+          ]
+        end
+        CASK
+        sed -i "s/VPLACEHOLDER/$VERSION/" Casks/mdlive-app.rb
+        sed -i "s/SHAPLACEHOLDER/$SHA_DMG/" Casks/mdlive-app.rb
+
     - name: Commit and push
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add Formula/mdlive.rb
+        git add Formula/mdlive.rb Casks/mdlive-app.rb
         git diff --staged --quiet && exit 0
         git commit -m "mdlive ${{ steps.version.outputs.version }}"
         git pull --rebase
