@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use tokio::task::AbortHandle;
 
 use crate::state::SharedMarkdownState;
-use crate::util::scan_supported_files;
+use crate::util::{is_supported_file, scan_supported_files};
 use crate::watcher::start_watcher;
 
 #[derive(Deserialize)]
@@ -263,7 +263,13 @@ pub(crate) async fn api_workspace_browse(
                         return None;
                     }
                     let ft = e.file_type().ok()?;
-                    if !ft.is_dir() && !ft.is_file() {
+                    if ft.is_dir() {
+                        // directories always shown
+                    } else if ft.is_file() {
+                        if !is_supported_file(&e.path()) {
+                            return None;
+                        }
+                    } else {
                         return None;
                     }
                     Some(BrowseEntry {

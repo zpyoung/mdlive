@@ -3,8 +3,47 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use mdlive::AppConfig;
-use tauri::menu::{AboutMetadata, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
+use tauri::menu::{
+    AboutMetadata, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder,
+};
 use tauri::Manager;
+
+#[cfg(target_os = "macos")]
+fn pick_file_or_folder(extensions: &[&str]) -> Option<PathBuf> {
+    use objc2::rc::Retained;
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::NSOpenPanel;
+    use objc2_foundation::NSString;
+
+    let mtm = unsafe { MainThreadMarker::new_unchecked() };
+
+    let panel = NSOpenPanel::openPanel(mtm);
+    panel.setCanChooseFiles(true);
+    panel.setCanChooseDirectories(true);
+    panel.setAllowsMultipleSelection(false);
+    panel.setResolvesAliases(true);
+
+    let ext_strings: Vec<Retained<NSString>> =
+        extensions.iter().map(|e| NSString::from_str(e)).collect();
+    let refs: Vec<&NSString> = ext_strings.iter().map(|s| &**s).collect();
+    let ns_array = objc2_foundation::NSArray::from_slice(&refs);
+    #[allow(deprecated)]
+    panel.setAllowedFileTypes(Some(&ns_array));
+
+    let result = panel.runModal();
+    if result == objc2_app_kit::NSModalResponseOK {
+        panel
+            .URL()
+            .and_then(|url| url.path().map(|p| PathBuf::from(p.to_string())))
+    } else {
+        None
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn pick_file_or_folder(_extensions: &[&str]) -> Option<PathBuf> {
+    rfd::FileDialog::new().pick_folder()
+}
 
 static SERVER_PORT: OnceLock<u16> = OnceLock::new();
 
@@ -30,7 +69,10 @@ fn get_server_url() -> String {
 // switch workspace via direct HTTP to our own server -- no webview dependency
 fn switch_workspace_http(path: &str) {
     let port = SERVER_PORT.get().copied().unwrap_or(3000);
-    let body = format!("{{\"path\":\"{}\"}}", path.replace('\\', "\\\\").replace('"', "\\\""));
+    let body = format!(
+        "{{\"path\":\"{}\"}}",
+        path.replace('\\', "\\\\").replace('"', "\\\"")
+    );
     let request = format!(
         "POST /api/workspace/switch HTTP/1.1\r\n\
          Host: 127.0.0.1:{port}\r\n\
@@ -74,14 +116,9 @@ fn shorten_path(path: &str) -> String {
 fn build_menu(app: &tauri::App) -> tauri::Result<()> {
     let config = AppConfig::load();
 
-    let open_file = MenuItemBuilder::new("Open File...")
-        .id("open_file")
+    let open = MenuItemBuilder::new("Open...")
+        .id("open")
         .accelerator("CmdOrCtrl+O")
-        .build(app)?;
-
-    let open_folder = MenuItemBuilder::new("Open Folder...")
-        .id("open_folder")
-        .accelerator("CmdOrCtrl+Shift+O")
         .build(app)?;
 
     // recent submenu -- files first, separator, then directories
@@ -147,8 +184,7 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         .build()?;
 
     let file_menu = SubmenuBuilder::new(app, "File")
-        .item(&open_file)
-        .item(&open_folder)
+        .item(&open)
         .separator()
         .item(&recent_menu)
         .separator()
@@ -213,28 +249,13 @@ pub fn run() {
             app.on_menu_event(|app_handle, event| {
                 let id = event.id().as_ref().to_string();
 
-                if id == "open_file" {
-                    let win = app_handle.get_webview_window("main");
-                    std::thread::spawn(move || {
-                        let file = rfd::FileDialog::new()
-                            .add_filter("Supported", &["md", "markdown", "txt", "json"])
-                            .pick_file();
-                        if let Some(path) = file {
-                            if let Some(ref window) = win {
-                                switch_workspace(window, &path.display().to_string());
-                            }
+                if id == "open" {
+                    let picked = pick_file_or_folder(&["md", "markdown", "txt", "json"]);
+                    if let Some(path) = picked {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            switch_workspace(&window, &path.display().to_string());
                         }
-                    });
-                } else if id == "open_folder" {
-                    let win = app_handle.get_webview_window("main");
-                    std::thread::spawn(move || {
-                        let folder = rfd::FileDialog::new().pick_folder();
-                        if let Some(path) = folder {
-                            if let Some(ref window) = win {
-                                switch_workspace(window, &path.display().to_string());
-                            }
-                        }
-                    });
+                    }
                 } else if let Some(path) = id.strip_prefix("recent:") {
                     if let Some(window) = app_handle.get_webview_window("main") {
                         switch_workspace(&window, path);
@@ -340,9 +361,7 @@ fn check_for_updates() {
     } else {
         rfd::MessageDialog::new()
             .set_title("Up to Date")
-            .set_description(&format!(
-                "You're running the latest version (v{current})."
-            ))
+            .set_description(&format!("You're running the latest version (v{current})."))
             .set_level(rfd::MessageLevel::Info)
             .show();
     }

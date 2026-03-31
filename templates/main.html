@@ -1392,6 +1392,13 @@
       .browse-modal-item:hover {
           background: var(--code-bg);
       }
+      .browse-modal-item.selected {
+          background: var(--link-color);
+          color: #fff;
+      }
+      .browse-modal-item.selected:hover {
+          opacity: 0.9;
+      }
       .browse-modal-item-icon {
           flex-shrink: 0;
           width: 18px;
@@ -5050,7 +5057,7 @@
         <ul class="browse-modal-list" id="browseList"></ul>
         <div class="browse-modal-footer">
           <button class="browse-modal-btn" onclick="closeBrowseModal()">Cancel</button>
-          <button class="browse-modal-btn browse-modal-btn-primary" onclick="browseSelectCurrent()">Open this folder</button>
+          <button class="browse-modal-btn browse-modal-btn-primary" id="browseOpenBtn" onclick="browseSelectCurrent()">Open</button>
         </div>
       </div>
     </div>
@@ -5361,9 +5368,11 @@
 
       var _browseCallback = null;
       var _browseCurrentPath = '';
+      var _browseSelectedFile = null;
 
       function openBrowseModal(startPath, onSelect) {
           _browseCallback = onSelect;
+          _browseSelectedFile = null;
           var modal = document.getElementById('browseModal');
           modal.classList.add('show');
           var pathInput = document.getElementById('browsePath');
@@ -5381,19 +5390,50 @@
                   }
               });
           }
-          browseTo(startPath);
+          var remembered = localStorage.getItem('mdlive_browse_last_path');
+          var initial = startPath && startPath !== '~' ? startPath : (remembered || startPath || '~');
+          browseTo(initial);
       }
 
       function closeBrowseModal() {
           var modal = document.getElementById('browseModal');
           modal.classList.remove('show');
           _browseCallback = null;
+          _browseSelectedFile = null;
+      }
+
+      function browseUpdateOpenBtn() {
+          var btn = document.getElementById('browseOpenBtn');
+          if (!btn) return;
+          if (_browseSelectedFile) {
+              var parts = _browseSelectedFile.split('/');
+              btn.textContent = 'Open ' + parts[parts.length - 1];
+          } else {
+              btn.textContent = 'Open folder';
+          }
+      }
+
+      function browseSelectFile(entry, li) {
+          var listEl = document.getElementById('browseList');
+          var prev = listEl.querySelector('.browse-modal-item.selected');
+          if (prev) prev.classList.remove('selected');
+
+          if (_browseSelectedFile === entry.path) {
+              _browseSelectedFile = null;
+          } else {
+              _browseSelectedFile = entry.path;
+              li.classList.add('selected');
+          }
+          browseUpdateOpenBtn();
       }
 
       function browseTo(path) {
           var listEl = document.getElementById('browseList');
           var pathInput = document.getElementById('browsePath');
           var upBtn = document.getElementById('browseUp');
+
+          _browseSelectedFile = null;
+          browseUpdateOpenBtn();
 
           listEl.innerHTML = '<li style="padding:16px;text-align:center;opacity:0.5;font-size:13px">Loading...</li>';
 
@@ -5406,13 +5446,14 @@
                   }
                   _browseCurrentPath = data.path;
                   pathInput.value = data.path;
+                  localStorage.setItem('mdlive_browse_last_path', data.path);
 
                   upBtn.disabled = !data.parent;
                   upBtn.onclick = data.parent ? function() { browseTo(data.parent); } : null;
 
                   listEl.innerHTML = '';
                   if (data.entries.length === 0) {
-                      listEl.innerHTML = '<li style="padding:16px;text-align:center;opacity:0.5;font-size:13px">Empty directory</li>';
+                      listEl.innerHTML = '<li style="padding:16px;text-align:center;opacity:0.5;font-size:13px">No supported files</li>';
                   }
                   data.entries.forEach(function(entry) {
                       var li = document.createElement('li');
@@ -5425,14 +5466,16 @@
                       name.className = 'browse-modal-item-name';
                       name.textContent = entry.name;
                       li.appendChild(name);
-                      li.onclick = function() {
-                          if (entry.is_dir) {
-                              browseTo(entry.path);
-                          } else {
-                              closeBrowseModal();
-                              if (_browseCallback) _browseCallback(entry.path);
-                          }
-                      };
+                      if (entry.is_dir) {
+                          li.ondblclick = function() { browseTo(entry.path); };
+                          li.onclick = function() { browseTo(entry.path); };
+                      } else {
+                          li.onclick = function() { browseSelectFile(entry, li); };
+                          li.ondblclick = function() {
+                              _browseSelectedFile = entry.path;
+                              browseSelectCurrent();
+                          };
+                      }
                       listEl.appendChild(li);
                   });
               })
@@ -5442,8 +5485,9 @@
       }
 
       function browseSelectCurrent() {
+          var selected = _browseSelectedFile || _browseCurrentPath;
           closeBrowseModal();
-          if (_browseCallback && _browseCurrentPath) _browseCallback(_browseCurrentPath);
+          if (_browseCallback && selected) _browseCallback(selected);
       }
 
       // wire up modal browse button (daemon workspace switcher)
