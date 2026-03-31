@@ -2227,6 +2227,13 @@
       .status-bar-spacer {
           flex: 1;
       }
+      .status-bar-version {
+          flex-shrink: 0;
+          font-size: 11px;
+          opacity: 0.35;
+          color: #fff;
+          padding-left: 8px;
+      }
     </style>
 
     <script src="/highlight.min.js"></script>
@@ -3057,7 +3064,7 @@
               window.location.reload();
             } else if (message.type === "WorkspaceChanged") {
               console.log("Workspace changed to: " + message.base_dir);
-              window.location.href = '/';
+              window.location.href = message.file ? '/' + message.file : '/';
             }
           } catch (error) {
             console.error("Error parsing WebSocket message:", error);
@@ -5041,6 +5048,7 @@
       {% if current_file %}<div class="status-bar-mode">{{ current_file }}</div>{% endif %}
       <div class="status-bar-spacer"></div>
       {% if editor_mode %}<div class="status-bar-mode">EDIT</div>{% endif %}
+      <div class="status-bar-version">v{{ app_version }}</div>
     </div>
     {% endif %}
 

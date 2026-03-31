@@ -64,13 +64,37 @@ pub(crate) async fn api_workspace_switch(
 ) -> Result<Json<WorkspaceResponse>, (StatusCode, Json<WorkspaceResponse>)> {
     let target = expand_path(&body.path);
 
-    let (base_dir, files, dir_mode) = if target.is_file() {
+    let (base_dir, files, dir_mode, target_file) = if target.is_file() {
         let base = target
             .parent()
             .unwrap_or(std::path::Path::new("."))
             .to_path_buf();
         let base = base.canonicalize().unwrap_or(base);
-        (base, vec![target], false)
+        let canonical = target.canonicalize().unwrap_or(target);
+        let rel = canonical
+            .strip_prefix(&base)
+            .unwrap_or(std::path::Path::new(""))
+            .to_string_lossy()
+            .to_string();
+        let all_files = scan_supported_files(&base).map_err(|e| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(WorkspaceResponse {
+                    success: false,
+                    error: Some(format!("failed to scan directory: {e}")),
+                    base_dir: None,
+                    mode: None,
+                    file_count: None,
+                }),
+            )
+        })?;
+        let files = if all_files.is_empty() {
+            vec![canonical]
+        } else {
+            all_files
+        };
+        let dir_mode = files.len() > 1;
+        (base, files, dir_mode, Some(rel))
     } else if target.is_dir() {
         let target = target.canonicalize().unwrap_or(target);
         let files = scan_supported_files(&target).map_err(|e| {
@@ -97,7 +121,7 @@ pub(crate) async fn api_workspace_switch(
                 }),
             ));
         }
-        (target, files, true)
+        (target, files, true, None)
     } else {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -118,7 +142,7 @@ pub(crate) async fn api_workspace_switch(
     {
         let mut guard = state.lock().await;
         guard
-            .switch_workspace(base_dir.clone(), files, dir_mode)
+            .switch_workspace(base_dir.clone(), files, dir_mode, target_file)
             .map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -323,25 +347,35 @@ pub(crate) async fn open_and_redirect(
             .unwrap_or(std::path::Path::new("."))
             .to_path_buf();
         let base = base.canonicalize().unwrap_or(base);
-        Some((base, vec![target], false))
+        let rel = target
+            .canonicalize()
+            .unwrap_or(target.clone())
+            .strip_prefix(&base)
+            .unwrap_or(std::path::Path::new(""))
+            .to_string_lossy()
+            .to_string();
+        let files = scan_supported_files(&base)
+            .unwrap_or_else(|_| vec![target.canonicalize().unwrap_or(target)]);
+        let dir_mode = files.len() > 1;
+        Some((base, files, dir_mode, Some(rel)))
     } else if target.is_dir() {
         let target_canon = target.canonicalize().unwrap_or(target);
         scan_supported_files(&target_canon).ok().and_then(|files| {
             if files.is_empty() {
                 None
             } else {
-                Some((target_canon, files, true))
+                Some((target_canon, files, true, None))
             }
         })
     } else {
         None
     };
 
-    if let Some((base_dir, files, dir_mode)) = result {
+    if let Some((base_dir, files, dir_mode, target_file)) = result {
         let switch_ok = {
             let mut guard = state.lock().await;
             guard
-                .switch_workspace(base_dir.clone(), files, dir_mode)
+                .switch_workspace(base_dir.clone(), files, dir_mode, target_file)
                 .is_ok()
         };
         if switch_ok {

@@ -27,7 +27,11 @@ pub(crate) enum ClientMessage {
 pub enum ServerMessage {
     Reload,
     Pong,
-    WorkspaceChanged { base_dir: String },
+    WorkspaceChanged {
+        base_dir: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        file: Option<String>,
+    },
 }
 
 pub(crate) struct TrackedFile {
@@ -142,6 +146,7 @@ impl MarkdownState {
         new_dir: PathBuf,
         files: Vec<PathBuf>,
         dir_mode: bool,
+        target_file: Option<String>,
     ) -> Result<()> {
         if let Some(handle) = self.watcher_abort.take() {
             handle.abort();
@@ -189,6 +194,7 @@ impl MarkdownState {
 
         let _ = self.change_tx.send(ServerMessage::WorkspaceChanged {
             base_dir: self.base_dir.display().to_string(),
+            file: target_file,
         });
 
         Ok(())

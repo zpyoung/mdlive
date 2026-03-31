@@ -15,6 +15,10 @@ pub(crate) fn template_env() -> &'static Environment<'static> {
     TEMPLATE_ENV.get_or_init(|| {
         let mut env = Environment::new();
         minijinja_embed::load_templates!(&mut env);
+        env.add_global(
+            "app_version",
+            minijinja::Value::from(env!("CARGO_PKG_VERSION")),
+        );
         env
     })
 }

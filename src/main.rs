@@ -65,6 +65,11 @@ async fn main() -> Result<()> {
         Some(path) => {
             let absolute_path = path.canonicalize().unwrap_or(path);
 
+            // try handing off to a running server (daemon or Tauri app)
+            if try_handoff(&absolute_path, cli.port) {
+                return Ok(());
+            }
+
             let (base_dir, tracked_files, is_directory_mode) = if absolute_path.is_file() {
                 let base_dir = absolute_path
                     .parent()
@@ -98,6 +103,56 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn try_handoff(path: &std::path::Path, port: u16) -> bool {
+    use std::io::{Read as _, Write as _};
+
+    let path_str = path.display().to_string();
+    let body = format!(
+        "{{\"path\":\"{}\"}}",
+        path_str.replace('\\', "\\\\").replace('"', "\\\"")
+    );
+    let request = format!(
+        "POST /api/workspace/switch HTTP/1.1\r\n\
+         Host: 127.0.0.1:{port}\r\n\
+         Content-Type: application/json\r\n\
+         Content-Length: {}\r\n\
+         Connection: close\r\n\
+         \r\n\
+         {body}",
+        body.len()
+    );
+
+    let addr = format!("127.0.0.1:{port}");
+    let Ok(mut stream) = std::net::TcpStream::connect_timeout(
+        &addr.parse().unwrap(),
+        std::time::Duration::from_millis(500),
+    ) else {
+        return false;
+    };
+
+    if stream.write_all(request.as_bytes()).is_err() {
+        return false;
+    }
+    let _ = stream.flush();
+
+    let mut buf = vec![0u8; 1024];
+    let _ = stream.read(&mut buf);
+    let response = String::from_utf8_lossy(&buf);
+
+    if !response.contains("\"success\":true") {
+        return false;
+    }
+
+    eprintln!("Switched running mdlive instance to: {path_str}");
+
+    // bring Tauri app to focus if installed
+    let _ = std::process::Command::new("open")
+        .args(["-a", "mdlive"])
+        .status();
+
+    true
 }
 
 fn handle_service(action: ServiceAction, hostname: &str, port: u16) -> Result<()> {
