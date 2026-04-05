@@ -70,6 +70,11 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
 
+            // try launching the Tauri app if installed
+            if try_launch_app(&absolute_path, cli.port) {
+                return Ok(());
+            }
+
             let (base_dir, tracked_files, is_directory_mode) = if absolute_path.is_file() {
                 let base_dir = absolute_path
                     .parent()
@@ -153,6 +158,32 @@ fn try_handoff(path: &std::path::Path, port: u16) -> bool {
         .status();
 
     true
+}
+
+fn try_launch_app(path: &std::path::Path, port: u16) -> bool {
+    if !std::path::Path::new("/Applications/mdlive.app").exists() {
+        return false;
+    }
+
+    eprintln!("Launching mdlive app...");
+    if std::process::Command::new("open")
+        .args(["-a", "mdlive"])
+        .status()
+        .is_err()
+    {
+        return false;
+    }
+
+    // poll until the app's server is ready
+    for _ in 0..50 {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        if try_handoff(path, port) {
+            return true;
+        }
+    }
+
+    eprintln!("App launched but server did not respond in time");
+    false
 }
 
 fn handle_service(action: ServiceAction, hostname: &str, port: u16) -> Result<()> {

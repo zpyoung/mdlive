@@ -63,6 +63,7 @@ pub(crate) async fn api_workspace_switch(
     Json(body): Json<SwitchRequest>,
 ) -> Result<Json<WorkspaceResponse>, (StatusCode, Json<WorkspaceResponse>)> {
     let target = expand_path(&body.path);
+    let original_path = target.display().to_string();
 
     let (base_dir, files, dir_mode, target_file) = if target.is_file() {
         let base = target
@@ -76,25 +77,7 @@ pub(crate) async fn api_workspace_switch(
             .unwrap_or(std::path::Path::new(""))
             .to_string_lossy()
             .to_string();
-        let all_files = scan_supported_files(&base).map_err(|e| {
-            (
-                StatusCode::BAD_REQUEST,
-                Json(WorkspaceResponse {
-                    success: false,
-                    error: Some(format!("failed to scan directory: {e}")),
-                    base_dir: None,
-                    mode: None,
-                    file_count: None,
-                }),
-            )
-        })?;
-        let files = if all_files.is_empty() {
-            vec![canonical]
-        } else {
-            all_files
-        };
-        let dir_mode = files.len() > 1;
-        (base, files, dir_mode, Some(rel))
+        (base, vec![canonical], false, Some(rel))
     } else if target.is_dir() {
         let target = target.canonicalize().unwrap_or(target);
         let files = scan_supported_files(&target).map_err(|e| {
@@ -142,7 +125,13 @@ pub(crate) async fn api_workspace_switch(
     {
         let mut guard = state.lock().await;
         guard
-            .switch_workspace(base_dir.clone(), files, dir_mode, target_file)
+            .switch_workspace(
+                base_dir.clone(),
+                files,
+                dir_mode,
+                target_file,
+                Some(original_path),
+            )
             .map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -340,6 +329,7 @@ pub(crate) async fn open_and_redirect(
     State(state): State<SharedMarkdownState>,
 ) -> Redirect {
     let target = expand_path(&params.path);
+    let original_path = target.display().to_string();
 
     let result = if target.is_file() {
         let base = target
@@ -375,7 +365,13 @@ pub(crate) async fn open_and_redirect(
         let switch_ok = {
             let mut guard = state.lock().await;
             guard
-                .switch_workspace(base_dir.clone(), files, dir_mode, target_file)
+                .switch_workspace(
+                    base_dir.clone(),
+                    files,
+                    dir_mode,
+                    target_file,
+                    Some(original_path),
+                )
                 .is_ok()
         };
         if switch_ok {

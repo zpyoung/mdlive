@@ -147,6 +147,7 @@ impl MarkdownState {
         files: Vec<PathBuf>,
         dir_mode: bool,
         target_file: Option<String>,
+        original_path: Option<String>,
     ) -> Result<()> {
         if let Some(handle) = self.watcher_abort.take() {
             handle.abort();
@@ -187,8 +188,13 @@ impl MarkdownState {
         self.mdlive_dir = Some(dir);
 
         let mode = if dir_mode { "directory" } else { "file" };
+        let recent_path = if dir_mode {
+            self.base_dir.display().to_string()
+        } else {
+            original_path.unwrap_or_else(|| self.base_dir.display().to_string())
+        };
         if let Some(ref mut config) = self.config {
-            config.add_recent(self.base_dir.display().to_string(), mode.to_string());
+            config.add_recent(recent_path, mode.to_string());
             let _ = config.save();
         }
 

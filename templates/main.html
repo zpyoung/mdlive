@@ -603,6 +603,9 @@
           max-width: var(--content-max-width);
           margin: 0 auto;
       }
+      .page-container:has(#content.content-code) {
+          max-width: none;
+      }
       {% endif %}
 
       /* Context Menu */
@@ -1228,6 +1231,13 @@
       .workspace-recent-item:hover {
           background: var(--code-bg);
       }
+      .workspace-recent-item.active {
+          background: var(--link-color);
+          color: #fff;
+      }
+      .workspace-recent-item.active .workspace-recent-path {
+          color: #fff;
+      }
 
       .workspace-recent-icon {
           font-size: 16px;
@@ -1277,6 +1287,21 @@
       }
       .workspace-browse-btn:hover {
           background: var(--border-color);
+      }
+      .workspace-open-btn {
+          padding: 8px 18px;
+          font-size: 14px;
+          font-weight: 500;
+          background: var(--link-color);
+          color: #fff;
+          border: 1px solid var(--link-color);
+          border-radius: 6px;
+          cursor: pointer;
+          flex-shrink: 0;
+          transition: opacity 0.15s;
+      }
+      .workspace-open-btn:hover {
+          opacity: 0.9;
       }
       .browse-modal {
           display: none;
@@ -1381,9 +1406,9 @@
       .browse-modal-item {
           display: flex;
           align-items: center;
-          padding: 8px 16px;
+          padding: 6px 16px 6px 0;
           cursor: pointer;
-          gap: 10px;
+          gap: 6px;
           font-family: var(--code-font);
           font-size: 13px;
           color: var(--text-color);
@@ -1409,6 +1434,33 @@
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+      }
+      .browse-tree-arrow {
+          flex-shrink: 0;
+          width: 16px;
+          text-align: center;
+          font-size: 10px;
+          color: var(--blockquote-color);
+          cursor: pointer;
+          user-select: none;
+          line-height: 1;
+          transition: transform 0.15s;
+      }
+      .browse-tree-arrow:hover {
+          color: var(--text-color);
+      }
+      .browse-tree-arrow.expanded {
+          transform: rotate(90deg);
+      }
+      .browse-tree-arrow-placeholder {
+          flex-shrink: 0;
+          width: 16px;
+      }
+      .browse-tree-loading {
+          font-size: 12px;
+          color: var(--blockquote-color);
+          font-style: italic;
+          cursor: default;
       }
       .browse-modal-footer {
           display: flex;
@@ -4588,6 +4640,7 @@
             </svg>
             Browse
           </button>
+          <button class="workspace-open-btn" id="pickerOpenBtn" type="button">Open</button>
         </div>
         <p class="workspace-error" id="pickerPageError"></p>
         <div class="workspace-recent-heading">Recent</div>
@@ -4600,12 +4653,18 @@
           var errEl = document.getElementById('pickerPageError');
           var list = document.getElementById('pickerPageRecentList');
           var browseBtn = document.getElementById('pickerBrowseBtn');
+          var openBtn = document.getElementById('pickerOpenBtn');
 
           input.addEventListener('keydown', function(e) {
               if (e.key === 'Enter') {
                   var val = input.value.trim();
                   if (val) doSwitch(val);
               }
+          });
+
+          openBtn.addEventListener('click', function() {
+              var val = input.value.trim();
+              if (val) doSwitch(val);
           });
 
           browseBtn.addEventListener('click', function() {
@@ -4650,7 +4709,14 @@
                   data.recent.forEach(function(entry) {
                       var li = document.createElement('li');
                       li.className = 'workspace-recent-item';
-                      li.onclick = function() { doSwitch(entry.path); };
+                      li.onclick = function() {
+                          var prev = list.querySelector('.workspace-recent-item.active');
+                          if (prev) prev.classList.remove('active');
+                          li.classList.add('active');
+                          input.value = entry.path;
+                          input.focus();
+                      };
+                      li.ondblclick = function() { doSwitch(entry.path); };
                       var icon = entry.mode === 'directory' ? '\uD83D\uDCC1' : '\uD83D\uDCC4';
                       li.innerHTML = '<span class="workspace-recent-icon">' + icon + '</span>' +
                           '<span class="workspace-recent-path">' + entry.path.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</span>';
@@ -5276,6 +5342,7 @@
             </svg>
             Browse
           </button>
+          <button class="workspace-open-btn" id="modalOpenBtn" type="button">Open</button>
         </div>
         <p class="workspace-error" id="workspaceError"></p>
         <div class="workspace-recent-heading">Recent</div>
@@ -5329,10 +5396,17 @@
                       list.innerHTML = '<li class="workspace-empty">No recent workspaces</li>';
                       return;
                   }
+                  var wsInput = document.getElementById('workspacePathInput');
                   data.recent.forEach(function(entry) {
                       var li = document.createElement('li');
                       li.className = 'workspace-recent-item';
-                      li.onclick = function() { switchWorkspace(entry.path); };
+                      li.onclick = function() {
+                          var prev = list.querySelector('.workspace-recent-item.active');
+                          if (prev) prev.classList.remove('active');
+                          li.classList.add('active');
+                          if (wsInput) { wsInput.value = entry.path; wsInput.focus(); }
+                      };
+                      li.ondblclick = function() { switchWorkspace(entry.path); };
                       var icon = entry.mode === 'directory' ? '\uD83D\uDCC1' : '\uD83D\uDCC4';
                       li.innerHTML = '<span class="workspace-recent-icon">' + icon + '</span>' +
                           '<span class="workspace-recent-path">' + escapeHtml(entry.path) + '</span>';
@@ -5377,10 +5451,13 @@
       var _browseCallback = null;
       var _browseCurrentPath = '';
       var _browseSelectedFile = null;
+      var _browseTreeCache = {};
+      var _browseTreeRoot = '';
 
       function openBrowseModal(startPath, onSelect) {
           _browseCallback = onSelect;
           _browseSelectedFile = null;
+          _browseTreeCache = {};
           var modal = document.getElementById('browseModal');
           modal.classList.add('show');
           var pathInput = document.getElementById('browsePath');
@@ -5390,7 +5467,7 @@
                   if (e.key === 'Enter') {
                       e.preventDefault();
                       var val = pathInput.value.trim();
-                      if (val) browseTo(val);
+                      if (val) browseSetRoot(val);
                   }
                   if (e.key === 'Escape') {
                       e.stopPropagation();
@@ -5400,7 +5477,7 @@
           }
           var remembered = localStorage.getItem('mdlive_browse_last_path');
           var initial = startPath && startPath !== '~' ? startPath : (remembered || startPath || '~');
-          browseTo(initial);
+          browseSetRoot(initial);
       }
 
       function closeBrowseModal() {
@@ -5421,26 +5498,13 @@
           }
       }
 
-      function browseSelectFile(entry, li) {
-          var listEl = document.getElementById('browseList');
-          var prev = listEl.querySelector('.browse-modal-item.selected');
-          if (prev) prev.classList.remove('selected');
-
-          if (_browseSelectedFile === entry.path) {
-              _browseSelectedFile = null;
-          } else {
-              _browseSelectedFile = entry.path;
-              li.classList.add('selected');
-          }
-          browseUpdateOpenBtn();
-      }
-
-      function browseTo(path) {
+      function browseSetRoot(path) {
           var listEl = document.getElementById('browseList');
           var pathInput = document.getElementById('browsePath');
           var upBtn = document.getElementById('browseUp');
 
           _browseSelectedFile = null;
+          _browseTreeCache = {};
           browseUpdateOpenBtn();
 
           listEl.innerHTML = '<li style="padding:16px;text-align:center;opacity:0.5;font-size:13px">Loading...</li>';
@@ -5453,52 +5517,166 @@
                       return;
                   }
                   _browseCurrentPath = data.path;
+                  _browseTreeRoot = data.path;
                   pathInput.value = data.path;
                   localStorage.setItem('mdlive_browse_last_path', data.path);
 
                   upBtn.disabled = !data.parent;
-                  upBtn.onclick = data.parent ? function() { browseTo(data.parent); } : null;
+                  upBtn.onclick = data.parent ? function() { browseSetRoot(data.parent); } : null;
 
-                  listEl.innerHTML = '';
-                  if (data.entries.length === 0) {
-                      listEl.innerHTML = '<li style="padding:16px;text-align:center;opacity:0.5;font-size:13px">No supported files</li>';
-                  }
-                  data.entries.forEach(function(entry) {
-                      var li = document.createElement('li');
-                      li.className = 'browse-modal-item';
-                      var icon = document.createElement('span');
-                      icon.className = 'browse-modal-item-icon';
-                      icon.textContent = entry.is_dir ? '\uD83D\uDCC1' : '\uD83D\uDCC4';
-                      li.appendChild(icon);
-                      var name = document.createElement('span');
-                      name.className = 'browse-modal-item-name';
-                      name.textContent = entry.name;
-                      li.appendChild(name);
-                      if (entry.is_dir) {
-                          li.ondblclick = function() { browseTo(entry.path); };
-                          li.onclick = function() { browseTo(entry.path); };
-                      } else {
-                          li.onclick = function() { browseSelectFile(entry, li); };
-                          li.ondblclick = function() {
-                              _browseSelectedFile = entry.path;
-                              browseSelectCurrent();
-                          };
-                      }
-                      listEl.appendChild(li);
-                  });
+                  _browseTreeCache[data.path] = { entries: data.entries, expanded: true };
+                  browseRenderTree();
               })
               .catch(function() {
                   listEl.innerHTML = '<li style="padding:16px;color:#e74c3c;font-size:13px">Network error</li>';
               });
       }
 
-      function browseSelectCurrent() {
-          var selected = _browseSelectedFile || _browseCurrentPath;
-          closeBrowseModal();
-          if (_browseCallback && selected) _browseCallback(selected);
+      function browseRenderTree() {
+          var listEl = document.getElementById('browseList');
+          listEl.innerHTML = '';
+
+          var rootCache = _browseTreeCache[_browseTreeRoot];
+          if (!rootCache || rootCache.entries.length === 0) {
+              listEl.innerHTML = '<li style="padding:16px;text-align:center;opacity:0.5;font-size:13px">No supported files</li>';
+              return;
+          }
+          browseRenderLevel(listEl, _browseTreeRoot, 0);
       }
 
-      // wire up modal browse button (daemon workspace switcher)
+      function browseRenderLevel(container, dirPath, depth) {
+          var cached = _browseTreeCache[dirPath];
+          if (!cached) return;
+
+          cached.entries.forEach(function(entry) {
+              var li = document.createElement('li');
+              li.className = 'browse-modal-item';
+              li.style.paddingLeft = (depth * 20 + 16) + 'px';
+
+              if (_browseSelectedFile === entry.path) {
+                  li.classList.add('selected');
+              }
+
+              if (entry.is_dir) {
+                  var arrow = document.createElement('span');
+                  arrow.className = 'browse-tree-arrow';
+                  var isExpanded = _browseTreeCache[entry.path] && _browseTreeCache[entry.path].expanded;
+                  arrow.textContent = '\u25B6';
+                  if (isExpanded) arrow.classList.add('expanded');
+                  arrow.onclick = function(e) {
+                      e.stopPropagation();
+                      browseToggleDir(entry.path);
+                  };
+                  li.appendChild(arrow);
+
+                  var icon = document.createElement('span');
+                  icon.className = 'browse-modal-item-icon';
+                  icon.textContent = '\uD83D\uDCC1';
+                  li.appendChild(icon);
+
+                  var nameEl = document.createElement('span');
+                  nameEl.className = 'browse-modal-item-name';
+                  nameEl.textContent = entry.name;
+                  li.appendChild(nameEl);
+
+                  li.onclick = function(e) {
+                      if (e.target === arrow) return;
+                      browseSelectItem(entry);
+                  };
+                  li.ondblclick = function(e) {
+                      e.stopPropagation();
+                      browseToggleDir(entry.path);
+                  };
+              } else {
+                  var placeholder = document.createElement('span');
+                  placeholder.className = 'browse-tree-arrow-placeholder';
+                  li.appendChild(placeholder);
+
+                  var icon = document.createElement('span');
+                  icon.className = 'browse-modal-item-icon';
+                  icon.textContent = '\uD83D\uDCC4';
+                  li.appendChild(icon);
+
+                  var nameEl = document.createElement('span');
+                  nameEl.className = 'browse-modal-item-name';
+                  nameEl.textContent = entry.name;
+                  li.appendChild(nameEl);
+
+                  li.onclick = function() { browseSelectItem(entry); };
+                  li.ondblclick = function() {
+                      _browseSelectedFile = entry.path;
+                      browseSelectCurrent();
+                  };
+              }
+
+              container.appendChild(li);
+
+              if (entry.is_dir && _browseTreeCache[entry.path]) {
+                  var childCache = _browseTreeCache[entry.path];
+                  if (childCache.loading && childCache.entries.length === 0) {
+                      var loadingLi = document.createElement('li');
+                      loadingLi.className = 'browse-modal-item browse-tree-loading';
+                      loadingLi.style.paddingLeft = ((depth + 1) * 20 + 16) + 'px';
+                      loadingLi.textContent = 'Loading...';
+                      container.appendChild(loadingLi);
+                  } else if (childCache.error) {
+                      var errLi = document.createElement('li');
+                      errLi.className = 'browse-modal-item browse-tree-loading';
+                      errLi.style.paddingLeft = ((depth + 1) * 20 + 16) + 'px';
+                      errLi.style.color = '#e74c3c';
+                      errLi.textContent = childCache.error;
+                      container.appendChild(errLi);
+                  } else if (childCache.expanded) {
+                      browseRenderLevel(container, entry.path, depth + 1);
+                  }
+              }
+          });
+      }
+
+      function browseToggleDir(dirPath) {
+          var cached = _browseTreeCache[dirPath];
+          if (cached) {
+              cached.expanded = !cached.expanded;
+              browseRenderTree();
+          } else {
+              _browseTreeCache[dirPath] = { entries: [], expanded: true, loading: true };
+              browseRenderTree();
+
+              fetch('/api/workspace/browse?path=' + encodeURIComponent(dirPath))
+                  .then(function(r) { return r.json(); })
+                  .then(function(data) {
+                      if (!data.success) {
+                          _browseTreeCache[dirPath] = { entries: [], expanded: true, error: data.error || 'Error' };
+                      } else {
+                          _browseTreeCache[dirPath] = { entries: data.entries, expanded: true };
+                      }
+                      browseRenderTree();
+                  })
+                  .catch(function() {
+                      _browseTreeCache[dirPath] = { entries: [], expanded: true, error: 'Network error' };
+                      browseRenderTree();
+                  });
+          }
+      }
+
+      function browseSelectItem(entry) {
+          if (_browseSelectedFile === entry.path) {
+              _browseSelectedFile = null;
+          } else {
+              _browseSelectedFile = entry.path;
+          }
+          browseUpdateOpenBtn();
+          browseRenderTree();
+      }
+
+      function browseSelectCurrent() {
+          var selected = _browseSelectedFile || _browseCurrentPath;
+          var callback = _browseCallback;
+          closeBrowseModal();
+          if (callback && selected) callback(selected);
+      }
+
+      // wire up modal browse + open buttons (daemon workspace switcher)
       (function() {
           var btn = document.getElementById('modalBrowseBtn');
           if (!btn) return;
@@ -5510,6 +5688,13 @@
                   switchWorkspace(path);
               });
           });
+          var openBtn = document.getElementById('modalOpenBtn');
+          if (openBtn) {
+              openBtn.addEventListener('click', function() {
+                  var val = input.value.trim();
+                  if (val) switchWorkspace(val);
+              });
+          }
       })();
 
       document.addEventListener('keydown', function(e) {
