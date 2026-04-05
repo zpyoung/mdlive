@@ -432,7 +432,13 @@ fn snapshot_file(canonical: &Path, relative: &str, mdlive_dir: &Path) {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
-    let snapshot_path = history_dir.join(format!("{timestamp}.md"));
+
+    // use source file's actual extension
+    let ext = canonical
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("md");
+    let snapshot_path = history_dir.join(format!("{timestamp}.{ext}"));
     let _ = fs::write(snapshot_path, old_content);
 
     // prune to 20 snapshots
@@ -440,7 +446,7 @@ fn snapshot_file(canonical: &Path, relative: &str, mdlive_dir: &Path) {
         let mut files: Vec<PathBuf> = entries
             .filter_map(|e| e.ok())
             .map(|e| e.path())
-            .filter(|p| p.extension().is_some_and(|ext| ext == "md"))
+            .filter(|p| p.is_file())
             .collect();
         if files.len() > 20 {
             files.sort();
@@ -474,7 +480,7 @@ pub(crate) async fn api_file_history(
     if let Ok(dir_entries) = fs::read_dir(&history_dir) {
         for entry in dir_entries.flatten() {
             let path = entry.path();
-            if path.extension().is_none_or(|ext| ext != "md") {
+            if !path.is_file() {
                 continue;
             }
             let timestamp = path
@@ -532,10 +538,18 @@ pub(crate) async fn api_restore_version(
         }
     };
 
+    // infer extension from tracked file
+    let ext = state
+        .tracked_files
+        .get(&body.path)
+        .and_then(|tf| tf.path.extension())
+        .and_then(|e| e.to_str())
+        .unwrap_or("md");
+
     let snapshot_path = mdlive_dir
         .join("history")
         .join(&body.path)
-        .join(format!("{}.md", body.timestamp));
+        .join(format!("{}.{}", body.timestamp, ext));
 
     let content = fs::read_to_string(&snapshot_path).map_err(|_| {
         (
@@ -587,10 +601,18 @@ pub(crate) async fn api_delete_history_entry(
         ));
     }
 
+    // infer extension from tracked file
+    let ext = state
+        .tracked_files
+        .get(&body.path)
+        .and_then(|tf| tf.path.extension())
+        .and_then(|e| e.to_str())
+        .unwrap_or("md");
+
     let history_base = mdlive_dir.join("history");
     let snapshot_path = history_base
         .join(&body.path)
-        .join(format!("{}.md", body.timestamp));
+        .join(format!("{}.{}", body.timestamp, ext));
 
     if !snapshot_path.exists() {
         return Err((

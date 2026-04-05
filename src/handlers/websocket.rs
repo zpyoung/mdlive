@@ -7,7 +7,7 @@ use axum::{
 };
 use futures_util::{SinkExt, StreamExt};
 
-use crate::state::{ClientMessage, SharedMarkdownState};
+use crate::state::SharedMarkdownState;
 
 pub(crate) async fn websocket_handler(
     ws: WebSocketUpgrade,
@@ -19,21 +19,34 @@ pub(crate) async fn websocket_handler(
 async fn handle_websocket(socket: WebSocket, state: SharedMarkdownState) {
     let (mut sender, mut receiver) = socket.split();
 
-    let mut change_rx = {
-        let state = state.lock().await;
-        state.change_tx.subscribe()
+    let (mut change_rx, initial_msg) = {
+        let guard = state.lock().await;
+        let rx = guard.change_tx.subscribe();
+        let msg = if guard.daemon_mode && guard.has_workspace() {
+            Some(crate::state::ServerMessage::WorkspaceChanged {
+                base_dir: guard.base_dir.display().to_string(),
+                file: None,
+            })
+        } else {
+            None
+        };
+        (rx, msg)
     };
+
+    // if a workspace is already loaded, notify this client immediately
+    if let Some(ref msg) = initial_msg {
+        eprintln!("[ws] client connected, workspace loaded -- sending WorkspaceChanged");
+        if let Ok(json) = serde_json::to_string(msg) {
+            let _ = sender.send(Message::Text(json)).await;
+        }
+    } else {
+        eprintln!("[ws] client connected, no workspace loaded");
+    }
 
     let recv_task = tokio::spawn(async move {
         while let Some(msg) = receiver.next().await {
             match msg {
-                Ok(Message::Text(text)) => {
-                    if let Ok(client_msg) = serde_json::from_str::<ClientMessage>(&text) {
-                        match client_msg {
-                            ClientMessage::Ping | ClientMessage::RequestRefresh => {}
-                        }
-                    }
-                }
+                Ok(Message::Text(_)) => {}
                 Ok(Message::Close(_)) => break,
                 _ => {}
             }
