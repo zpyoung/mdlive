@@ -337,17 +337,13 @@ pub(crate) async fn open_and_redirect(
             .unwrap_or(std::path::Path::new("."))
             .to_path_buf();
         let base = base.canonicalize().unwrap_or(base);
-        let rel = target
-            .canonicalize()
-            .unwrap_or(target.clone())
+        let canonical = target.canonicalize().unwrap_or(target);
+        let rel = canonical
             .strip_prefix(&base)
             .unwrap_or(std::path::Path::new(""))
             .to_string_lossy()
             .to_string();
-        let files = scan_supported_files(&base)
-            .unwrap_or_else(|_| vec![target.canonicalize().unwrap_or(target)]);
-        let dir_mode = files.len() > 1;
-        Some((base, files, dir_mode, Some(rel)))
+        Some((base, vec![canonical], false, Some(rel)))
     } else if target.is_dir() {
         let target_canon = target.canonicalize().unwrap_or(target);
         scan_supported_files(&target_canon).ok().and_then(|files| {

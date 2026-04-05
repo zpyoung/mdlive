@@ -2,7 +2,9 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-use mdlive::{scan_supported_files, serve_daemon, serve_markdown};
+use mdlive::{
+    delete_daemon_port, read_daemon_port, scan_supported_files, serve_daemon, serve_markdown,
+};
 
 #[derive(Parser)]
 #[command(name = "mdlive")]
@@ -23,6 +25,10 @@ struct Cli {
     /// Don't open the preview in the default browser
     #[arg(long)]
     no_open: bool,
+
+    /// Verbose logging for debugging handoff and server startup
+    #[arg(short, long)]
+    verbose: bool,
 
     #[command(subcommand)]
     command: Option<Command>,
@@ -53,6 +59,15 @@ enum ServiceAction {
 
 const LAUNCHD_LABEL: &str = "com.beardedgiant.mdlive";
 
+fn get_uid() -> String {
+    std::process::Command::new("id")
+        .arg("-u")
+        .output()
+        .ok()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_else(|| "501".to_string())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -61,18 +76,33 @@ async fn main() -> Result<()> {
         return handle_service(action, &cli.hostname, cli.port);
     }
 
+    let verbose = cli.verbose;
+
     match cli.path {
         Some(path) => {
             let absolute_path = path.canonicalize().unwrap_or(path);
 
+            if verbose {
+                eprintln!("[verbose] path: {}", absolute_path.display());
+                eprintln!("[verbose] trying handoff to port {}", cli.port);
+            }
+
             // try handing off to a running server (daemon or Tauri app)
-            if try_handoff(&absolute_path, cli.port) {
+            if try_handoff(&absolute_path, cli.port, verbose) {
                 return Ok(());
             }
 
+            if verbose {
+                eprintln!("[verbose] handoff failed, trying app launch");
+            }
+
             // try launching the Tauri app if installed
-            if try_launch_app(&absolute_path, cli.port) {
+            if try_launch_app(&absolute_path, cli.port, verbose) {
                 return Ok(());
+            }
+
+            if verbose {
+                eprintln!("[verbose] no app found, starting standalone server");
             }
 
             let (base_dir, tracked_files, is_directory_mode) = if absolute_path.is_file() {
@@ -110,14 +140,33 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn try_handoff(path: &std::path::Path, port: u16) -> bool {
+fn try_handoff(path: &std::path::Path, port: u16, verbose: bool) -> bool {
+    if verbose {
+        eprintln!("[verbose] try_handoff: port {port}");
+    }
+    if try_handoff_on_port(path, port, verbose) {
+        return true;
+    }
+
+    if let Some(daemon_port) = read_daemon_port() {
+        if verbose {
+            eprintln!("[verbose] portfile says {daemon_port}");
+        }
+        if daemon_port != port && try_handoff_on_port(path, daemon_port, verbose) {
+            return true;
+        }
+    } else if verbose {
+        eprintln!("[verbose] no portfile found");
+    }
+
+    false
+}
+
+fn try_handoff_on_port(path: &std::path::Path, port: u16, verbose: bool) -> bool {
     use std::io::{Read as _, Write as _};
 
     let path_str = path.display().to_string();
-    let body = format!(
-        "{{\"path\":\"{}\"}}",
-        path_str.replace('\\', "\\\\").replace('"', "\\\"")
-    );
+    let body = serde_json::json!({ "path": path_str }).to_string();
     let request = format!(
         "POST /api/workspace/switch HTTP/1.1\r\n\
          Host: 127.0.0.1:{port}\r\n\
@@ -134,8 +183,15 @@ fn try_handoff(path: &std::path::Path, port: u16) -> bool {
         &addr.parse().unwrap(),
         std::time::Duration::from_millis(500),
     ) else {
+        if verbose {
+            eprintln!("[verbose] connect to {addr} failed");
+        }
         return false;
     };
+
+    if verbose {
+        eprintln!("[verbose] connected to {addr}, sending switch request");
+    }
 
     if stream.write_all(request.as_bytes()).is_err() {
         return false;
@@ -146,13 +202,23 @@ fn try_handoff(path: &std::path::Path, port: u16) -> bool {
     let _ = stream.read(&mut buf);
     let response = String::from_utf8_lossy(&buf);
 
+    if verbose {
+        let first_line = response.lines().next().unwrap_or("");
+        eprintln!("[verbose] response: {first_line}");
+    }
+
     if !response.contains("\"success\":true") {
+        if verbose {
+            eprintln!(
+                "[verbose] switch failed: {}",
+                response.trim_matches('\0').trim()
+            );
+        }
         return false;
     }
 
-    eprintln!("Switched running mdlive instance to: {path_str}");
+    eprintln!("Switched running mdlive instance to: {}", path.display());
 
-    // bring Tauri app to focus if installed
     let _ = std::process::Command::new("open")
         .args(["-a", "mdlive"])
         .status();
@@ -160,8 +226,15 @@ fn try_handoff(path: &std::path::Path, port: u16) -> bool {
     true
 }
 
-fn try_launch_app(path: &std::path::Path, port: u16) -> bool {
-    if !std::path::Path::new("/Applications/mdlive.app").exists() {
+fn try_launch_app(path: &std::path::Path, port: u16, verbose: bool) -> bool {
+    let app_exists = std::path::Path::new("/Applications/mdlive.app").exists()
+        || dirs::home_dir()
+            .map(|h| h.join("Applications/mdlive.app").exists())
+            .unwrap_or(false);
+    if !app_exists {
+        if verbose {
+            eprintln!("[verbose] no mdlive.app found");
+        }
         return false;
     }
 
@@ -174,10 +247,12 @@ fn try_launch_app(path: &std::path::Path, port: u16) -> bool {
         return false;
     }
 
-    // poll until the app's server is ready
-    for _ in 0..50 {
+    for i in 0..50 {
         std::thread::sleep(std::time::Duration::from_millis(100));
-        if try_handoff(path, port) {
+        if verbose && i % 10 == 0 && i > 0 {
+            eprintln!("[verbose] polling... {i}/50");
+        }
+        if try_handoff(path, port, verbose) {
             return true;
         }
     }
@@ -226,8 +301,10 @@ fn handle_service(action: ServiceAction, hostname: &str, port: u16) -> Result<()
 
             std::fs::write(&plist_path, plist)?;
 
+            let uid = get_uid();
             let status = std::process::Command::new("launchctl")
-                .args(["load", "-w"])
+                .arg("bootstrap")
+                .arg(format!("gui/{uid}"))
                 .arg(&plist_path)
                 .status()?;
 
@@ -236,7 +313,7 @@ fn handle_service(action: ServiceAction, hostname: &str, port: u16) -> Result<()
                 println!("  Plist: {}", plist_path.display());
                 println!("  http://{hostname}:{port}");
             } else {
-                anyhow::bail!("launchctl load failed");
+                anyhow::bail!("launchctl bootstrap failed");
             }
         }
         ServiceAction::Start => {
@@ -261,11 +338,14 @@ fn handle_service(action: ServiceAction, hostname: &str, port: u16) -> Result<()
             } else {
                 println!("{LAUNCHD_LABEL}: not running or not installed");
             }
+            delete_daemon_port();
         }
         ServiceAction::Uninstall => {
             if plist_path.exists() {
+                let uid = get_uid();
                 let _ = std::process::Command::new("launchctl")
-                    .args(["unload"])
+                    .arg("bootout")
+                    .arg(format!("gui/{uid}"))
                     .arg(&plist_path)
                     .status();
                 std::fs::remove_file(&plist_path)?;

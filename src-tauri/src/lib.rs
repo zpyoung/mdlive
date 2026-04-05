@@ -46,17 +46,58 @@ fn pick_file_or_folder(_extensions: &[&str]) -> Option<PathBuf> {
 }
 
 static SERVER_PORT: OnceLock<u16> = OnceLock::new();
+static OWNS_SERVER: OnceLock<bool> = OnceLock::new();
+
+fn check_mdlive_server(port: u16) -> bool {
+    use std::io::{Read as _, Write as _};
+    let request = format!(
+        "GET /api/workspace/current HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+    );
+    let Ok(mut stream) = std::net::TcpStream::connect_timeout(
+        &format!("127.0.0.1:{port}").parse().unwrap(),
+        std::time::Duration::from_millis(300),
+    ) else {
+        return false;
+    };
+    let _ = stream.write_all(request.as_bytes());
+    let _ = stream.flush();
+    let mut buf = vec![0u8; 512];
+    let _ = stream.read(&mut buf);
+    String::from_utf8_lossy(&buf).contains("\"success\"")
+}
+
+fn find_existing_server() -> Option<u16> {
+    if check_mdlive_server(3000) {
+        return Some(3000);
+    }
+    if let Some(port) = mdlive::read_daemon_port() {
+        if port != 3000 && check_mdlive_server(port) {
+            return Some(port);
+        }
+    }
+    None
+}
 
 async fn start_server() -> u16 {
-    let router = mdlive::new_daemon_router();
+    // reuse existing daemon if running
+    if let Some(port) = find_existing_server() {
+        eprintln!("Reusing existing mdlive server on port {port}");
+        OWNS_SERVER.set(false).ok();
+        return port;
+    }
+
+    let router = mdlive::new_daemon_router_with_config(AppConfig::load());
     let (listener, port) = mdlive::bind_with_port_increment("127.0.0.1", 3000)
         .await
         .expect("failed to bind server");
+
+    mdlive::write_daemon_port(port);
 
     tokio::spawn(async move {
         axum::serve(listener, router).await.expect("server crashed");
     });
 
+    OWNS_SERVER.set(true).ok();
     port
 }
 
@@ -69,10 +110,7 @@ fn get_server_url() -> String {
 // switch workspace via direct HTTP to our own server -- no webview dependency
 fn switch_workspace_http(path: &str) {
     let port = SERVER_PORT.get().copied().unwrap_or(3000);
-    let body = format!(
-        "{{\"path\":\"{}\"}}",
-        path.replace('\\', "\\\\").replace('"', "\\\"")
-    );
+    let body = serde_json::json!({ "path": path }).to_string();
     let request = format!(
         "POST /api/workspace/switch HTTP/1.1\r\n\
          Host: 127.0.0.1:{port}\r\n\
@@ -270,7 +308,10 @@ pub fn run() {
                 }
             });
 
-            install_cli();
+            // only install CLI if we own the server (not reusing daemon)
+            if OWNS_SERVER.get().copied().unwrap_or(true) {
+                install_cli();
+            }
 
             // keep tokio runtime alive for the lifetime of the app
             std::mem::forget(rt);

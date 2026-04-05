@@ -74,6 +74,8 @@ pub async fn serve_daemon(hostname: impl AsRef<str>, port: u16, open: bool) -> R
 
     let listen_addr = format_host(hostname, actual_port);
 
+    write_daemon_port(actual_port);
+
     println!("  mdlive daemon started");
     println!("  Server running at: http://{listen_addr}");
     println!("\nPress Ctrl+C to stop the server");
@@ -84,6 +86,8 @@ pub async fn serve_daemon(hostname: impl AsRef<str>, port: u16, open: bool) -> R
     }
 
     axum::serve(listener, router).await?;
+
+    delete_daemon_port();
 
     Ok(())
 }
@@ -162,6 +166,30 @@ fn open_browser(url: &str) -> Result<()> {
     });
 
     Ok(())
+}
+
+fn get_daemon_port_file() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join(".config/mdlive/daemon.port"))
+}
+
+pub fn write_daemon_port(port: u16) {
+    if let Some(port_file) = get_daemon_port_file() {
+        if let Some(parent) = port_file.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&port_file, port.to_string());
+    }
+}
+
+pub fn read_daemon_port() -> Option<u16> {
+    let port_file = get_daemon_port_file()?;
+    std::fs::read_to_string(port_file).ok()?.trim().parse().ok()
+}
+
+pub fn delete_daemon_port() {
+    if let Some(port_file) = get_daemon_port_file() {
+        let _ = std::fs::remove_file(port_file);
+    }
 }
 
 #[cfg(test)]

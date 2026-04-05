@@ -146,7 +146,7 @@ pub(crate) async fn render_file(
             return (StatusCode::NOT_FOUND, Html("File not found".to_string()));
         };
 
-    let has_history = state.mdlive_dir.is_some() && file_type == "markdown";
+    let has_history = state.mdlive_dir.is_some();
 
     let rendered = if state.show_navigation() {
         let file_infos = state.get_file_infos();
@@ -253,7 +253,7 @@ fn render_editor(
     };
 
     let file_type = file_type_class(current_file);
-    let has_history = state.mdlive_dir.is_some() && !new_file_mode && file_type == "markdown";
+    let has_history = state.mdlive_dir.is_some() && !new_file_mode;
     let file_modified = if !new_file_mode {
         state
             .tracked_files

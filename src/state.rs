@@ -15,13 +15,6 @@ use crate::util::is_markdown_file;
 
 pub(crate) type SharedMarkdownState = Arc<Mutex<MarkdownState>>;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "type")]
-pub(crate) enum ClientMessage {
-    Ping,
-    RequestRefresh,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "type")]
 pub enum ServerMessage {
@@ -198,6 +191,11 @@ impl MarkdownState {
             let _ = config.save();
         }
 
+        let rx_count = self.change_tx.receiver_count();
+        eprintln!(
+            "[state] workspace switched to: {} ({rx_count} ws receivers)",
+            self.base_dir.display()
+        );
         let _ = self.change_tx.send(ServerMessage::WorkspaceChanged {
             base_dir: self.base_dir.display().to_string(),
             file: target_file,
