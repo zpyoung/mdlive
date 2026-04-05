@@ -9,7 +9,7 @@ pub(crate) const MARKED_JS: &str = include_str!("../static/js/marked.min.js");
 pub(crate) const MD_ICON_PNG: &[u8] = include_bytes!("../static/img/md.png");
 pub(crate) const FAVICON_PNG: &[u8] = include_bytes!("../static/img/favicon.png");
 pub(crate) const MDLIVE_LOGO_PNG: &[u8] = include_bytes!("../static/img/mdlive.png");
-pub(crate) const STATIC_ETAG: &str = concat!("\"", env!("CARGO_PKG_VERSION"), "\"");
+pub(crate) const STATIC_ETAG: &str = concat!("\"", env!("MDLIVE_VERSION"), "\"");
 
 pub(crate) fn template_env() -> &'static Environment<'static> {
     TEMPLATE_ENV.get_or_init(|| {
@@ -17,7 +17,7 @@ pub(crate) fn template_env() -> &'static Environment<'static> {
         minijinja_embed::load_templates!(&mut env);
         env.add_global(
             "app_version",
-            minijinja::Value::from(env!("CARGO_PKG_VERSION")),
+            minijinja::Value::from(env!("MDLIVE_VERSION")),
         );
         env
     })

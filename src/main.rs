@@ -9,7 +9,7 @@ use mdlive::{
 #[derive(Parser)]
 #[command(name = "mdlive")]
 #[command(about = "Markdown workspace server for AI coding agents")]
-#[command(version)]
+#[command(version = env!("MDLIVE_VERSION"))]
 struct Cli {
     /// Path to markdown file or directory to serve (omit for daemon mode)
     path: Option<PathBuf>,

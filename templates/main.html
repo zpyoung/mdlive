@@ -1498,6 +1498,17 @@
           justify-content: center;
           height: 100vh;
           overflow-y: auto;
+          position: relative;
+      }
+
+      .workspace-picker-version {
+          position: absolute;
+          bottom: 16px;
+          right: 16px;
+          font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+          font-size: 11px;
+          opacity: 0.35;
+          color: var(--blockquote-color);
       }
 
       .workspace-picker-page .workspace-modal-content {
@@ -2051,6 +2062,7 @@
 
       .editor-preview {
           padding: 20px;
+          padding-bottom: 48px;
           max-width: none;
       }
 
@@ -2236,12 +2248,12 @@
           }
       }
 
-      /* Status bar */
+      /* Status bar clearance */
       .page-container {
-          padding-bottom: 24px;
+          padding-bottom: 48px;
       }
       .editor-container {
-          padding-bottom: 24px;
+          padding-bottom: 48px;
       }
       .status-bar {
           position: fixed;
@@ -4553,6 +4565,7 @@
         <div class="workspace-recent-heading">Recent</div>
         <ul class="workspace-recent-list" id="pickerPageRecentList"></ul>
       </div>
+      <div class="workspace-picker-version">v{{ app_version }}</div>
     </div>
     <script>
       (function() {
@@ -4918,15 +4931,15 @@
     </script>
     {% endif %} {% endif %} {% endif %}
 
-    {% if base_dir %}
     <div class="status-bar" id="statusBar">
+      {% if base_dir %}
       <div class="status-bar-path" title="{{ base_dir }}"><span>{{ base_dir }}</span></div>
       {% if current_file %}<div class="status-bar-mode">{{ current_file }}</div>{% endif %}
+      {% endif %}
       <div class="status-bar-spacer"></div>
       {% if editor_mode %}<div class="status-bar-mode">EDIT</div>{% endif %}
       <div class="status-bar-version">v{{ app_version }}</div>
     </div>
-    {% endif %}
 
     <div class="browse-modal" id="browseModal" onclick="if(event.target===this)closeBrowseModal()">
       <div class="browse-modal-content">
