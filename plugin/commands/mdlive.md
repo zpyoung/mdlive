@@ -41,7 +41,7 @@ comfortably within a terminal window.
    command: mdlive --open plan.md
    run_in_background: true
    ```
-3. Tell the user the URL (default: http://127.0.0.1:3000).
+3. Tell the user the URL (default: http://127.0.0.1:4891).
 4. Continue editing the file - changes reload automatically.
 5. When the task is finished and the preview is no longer needed, stop
    the background task using `TaskStop` with the task ID.
@@ -51,10 +51,10 @@ comfortably within a terminal window.
 Before starting mdlive, check if the default port is in use:
 
 ```bash
-ss -tlnp | grep :3000
+ss -tlnp | grep :4891
 ```
 
-If port 3000 is occupied, pick another port:
+If port 4891 is occupied, pick another port:
 
 ```
 command: mdlive --open plan.md --port 3001

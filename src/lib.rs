@@ -12,6 +12,8 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
 use tokio::net::TcpListener;
 
+pub const DEFAULT_PORT: u16 = 4891;
+
 pub use config::AppConfig;
 pub use config::RecentWorkspace;
 pub use router::new_daemon_router;

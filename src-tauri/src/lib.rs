@@ -67,11 +67,11 @@ fn check_mdlive_server(port: u16) -> bool {
 }
 
 fn find_existing_server() -> Option<u16> {
-    if check_mdlive_server(3000) {
-        return Some(3000);
+    if check_mdlive_server(mdlive::DEFAULT_PORT) {
+        return Some(mdlive::DEFAULT_PORT);
     }
     if let Some(port) = mdlive::read_daemon_port() {
-        if port != 3000 && check_mdlive_server(port) {
+        if port != mdlive::DEFAULT_PORT && check_mdlive_server(port) {
             return Some(port);
         }
     }
@@ -87,7 +87,7 @@ async fn start_server() -> u16 {
     }
 
     let router = mdlive::new_daemon_router_with_config(AppConfig::load());
-    let (listener, port) = mdlive::bind_with_port_increment("127.0.0.1", 3000)
+    let (listener, port) = mdlive::bind_with_port_increment("127.0.0.1", mdlive::DEFAULT_PORT)
         .await
         .expect("failed to bind server");
 
@@ -103,13 +103,13 @@ async fn start_server() -> u16 {
 
 #[tauri::command]
 fn get_server_url() -> String {
-    let port = SERVER_PORT.get().copied().unwrap_or(3000);
+    let port = SERVER_PORT.get().copied().unwrap_or(mdlive::DEFAULT_PORT);
     format!("http://127.0.0.1:{port}")
 }
 
 // switch workspace via direct HTTP to our own server -- no webview dependency
 fn switch_workspace_http(path: &str) {
-    let port = SERVER_PORT.get().copied().unwrap_or(3000);
+    let port = SERVER_PORT.get().copied().unwrap_or(mdlive::DEFAULT_PORT);
     let body = serde_json::json!({ "path": path }).to_string();
     let request = format!(
         "POST /api/workspace/switch HTTP/1.1\r\n\

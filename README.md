@@ -110,7 +110,7 @@ The recent workspaces list (up to 15 entries, FIFO) is stored at `~/.config/mdli
 mdlive can install itself as a LaunchAgent so it starts automatically when you log in and stays running in the background.
 
 ```bash
-mdlive service install              # install and start (port 3000)
+mdlive service install              # install and start (port 4891)
 mdlive service install -p 3030      # use a specific port
 mdlive service start                # start the daemon
 mdlive service stop                 # stop the daemon
@@ -124,7 +124,7 @@ The plist lives at `~/Library/LaunchAgents/com.beardedgiant.mdlive.plist`. Unins
 
 The macOS desktop app wraps the same server in a native window via [Tauri](https://tauri.app/). No browser required. It launches in daemon mode with the workspace picker, and the bundled CLI means `mdlive` works from your terminal too.
 
-The app automatically finds a free port (starting at 3000) and opens a WebKit webview. File watching, WebSocket reload, and everything else works identically to the browser experience.
+The app automatically finds a free port (starting at 4891) and opens a WebKit webview. File watching, WebSocket reload, and everything else works identically to the browser experience.
 
 ### Keyboard shortcuts
 
@@ -150,7 +150,7 @@ Press `/` to see all available shortcuts. Shortcuts are suppressed when typing i
 
 ```bash
 mdlive                        # daemon mode with workspace picker
-mdlive file.md                # serve a single file (port 3000)
+mdlive file.md                # serve a single file (port 4891)
 mdlive docs/                  # directory mode with sidebar
 mdlive docs/ -p 8080          # custom port
 mdlive file.md --no-open      # don't auto-open the browser

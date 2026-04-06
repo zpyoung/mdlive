@@ -19,7 +19,7 @@ struct Cli {
     hostname: String,
 
     /// Port to serve on
-    #[arg(short, long, default_value = "3000")]
+    #[arg(short, long, default_value_t = mdlive::DEFAULT_PORT)]
     port: u16,
 
     /// Don't open the preview in the default browser
