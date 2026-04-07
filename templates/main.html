@@ -3134,6 +3134,8 @@
               window.location.reload();
             } else if (message.type === "WorkspaceChanged") {
               console.log("Workspace changed to: " + message.base_dir);
+              // skip navigation if we're already showing this workspace
+              if (message.base_dir && message.base_dir === baseDir && !message.file) return;
               window.location.href = message.file ? '/' + message.file : '/';
             }
           } catch (error) {
